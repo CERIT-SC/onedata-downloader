@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Python 3 script which can download Onedata space or a directory recursively with all its content. 
+Python script which can download Onedata space or a directory recursively with all its content. 
 
 Requirements:
 - Python 3
@@ -10,9 +10,8 @@ Requirements:
 
 import argparse
 import os
-import json
-import subprocess
 import requests
+import subprocess
 
 def download_file(onezone, file_id, file_name, directory):
     """
@@ -44,14 +43,14 @@ def process_directory(onezone, file_id, file_name, directory):
     
     # get content of new directory
     url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/children"
-    command = "curl -sL " + url
-    stream = os.popen(command)
-    output = stream.read()
-    js = json.loads(output)
 
-    # process child nodes
-    for child in js['children']:
-        process_node(onezone, child['id'], directory + os.sep + file_name)
+    response = requests.get(url)
+    if response.ok:
+        response_json = response.json()
+        
+        # process child nodes
+        for child in response_json['children']:
+            process_node(onezone, child['id'], directory + os.sep + file_name)
 
 def process_node(onezone, file_id, directory):
     """
@@ -61,9 +60,9 @@ def process_node(onezone, file_id, directory):
     url = onezone + "/api/v3/onezone/shares/data/" + file_id
     response = requests.get(url)
     if response.ok:
-        resnonse_json = response.json()
-        node_type = resnonse_json["type"]
-        node_name = resnonse_json["name"]
+        response_json = response.json()
+        node_type = response_json["type"]
+        node_name = response_json["name"]
 
         # check if node is directory or folder
         if node_type == "reg":
