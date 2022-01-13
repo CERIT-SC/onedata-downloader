@@ -12,6 +12,7 @@ import argparse
 import os
 import json
 import subprocess
+import requests
 
 def download_file(onezone, file_id, file_name, directory):
     """
@@ -58,20 +59,22 @@ def process_node(onezone, file_id, directory):
     """
     # get attributes of node (basic information)
     url = onezone + "/api/v3/onezone/shares/data/" + file_id
-    command = "curl -sL " + url
-    stream = os.popen(command)
-    output = stream.read()
-    js = json.loads(output)
-    node_type = js["type"]
-    node_name = js["name"]
+    response = requests.get(url)
+    if response.ok:
+        resnonse_json = response.json()
+        node_type = resnonse_json["type"]
+        node_name = resnonse_json["name"]
 
-    # check if node is directory or folder
-    if node_type == "reg":
-        download_file(onezone, file_id, node_name, directory)
-    elif node_type == "dir":
-        process_directory(onezone, file_id, node_name, directory)
+        # check if node is directory or folder
+        if node_type == "reg":
+            download_file(onezone, file_id, node_name, directory)
+        elif node_type == "dir":
+            process_directory(onezone, file_id, node_name, directory)
+        else:
+            print("Error: unknown type of file:", node_type)
     else:
-        print("Error: unknown type of file:", node_type)
+        print("Error: failed to retrieve information about node (Does the node exist?). File ID =")
+        print(file_id)
 
 def main():
     parser = argparse.ArgumentParser(description='Download whole space, folder or a file from Onedata')
