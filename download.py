@@ -21,8 +21,6 @@ def download_file(onezone, file_id, file_name, directory):
     if not os.path.exists(directory + os.sep + file_name):
         print("Downloading file", directory + os.sep + file_name)
         url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/content"
-        #command = "curl --output " + directory + os.sep + file_name + " -sL " + url
-        #os.popen(command)
         args = ["curl", "--output", directory + os.sep + file_name, "-sL", url]
         process = subprocess.run(args, stdout=subprocess.PIPE)
         if process.returncode == 0:
