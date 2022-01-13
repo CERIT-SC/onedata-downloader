@@ -51,6 +51,9 @@ def process_directory(onezone, file_id, file_name, directory):
         # process child nodes
         for child in response_json['children']:
             process_node(onezone, child['id'], directory + os.sep + file_name)
+    else:
+        print("Error: failed to process directory " + file_name + ", file ID =")
+        print(file_id)
 
 def process_node(onezone, file_id, directory):
     """
