@@ -7,7 +7,13 @@ Python script by which you can download Onedata space with all its content.
 
 import argparse
 import os
-import requests
+try:
+    import requests
+except:
+    print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
+    print("You can install it by command:")
+    print("pip install requests")
+    exit()
 
 def download_file(onezone, file_id, file_name, directory):
     """
