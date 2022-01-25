@@ -1,10 +1,25 @@
-Python script which can download Onedata space or a directory recursively with all its content. 
+Python script by which you can download Onedata space with all its content. 
 
 Requirements:
 - Python 3
-- curl
+- module requests
 
-Usage:
+Python 3 can be installed from URL
+https://www.python.org/downloads/
+
+Module requests can be installed by commands
+
+ pip3 install requests
+
+Script can be run by commands
+
+ python3 download.py FILE_ID
+
+or
+
+ ./download.py FILE_ID
+
+Arguments:
 ```
 positional arguments:
   file_id            File ID of space, directory or file which should be downloaded
