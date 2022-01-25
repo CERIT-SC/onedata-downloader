@@ -57,6 +57,12 @@ def process_node(onezone, file_id, directory):
     """
     Process given node (directory or file).
     """
+    LENGTH_OF_FILE_ID = 269
+    # check file_id
+    if len(file_id) == LENGTH_OF_FILE_ID:
+        print("Error: it seems that the given file id has incorrect length")
+        return
+
     # get attributes of node (basic information)
     url = onezone + "/api/v3/onezone/shares/data/" + file_id
     response = requests.get(url)
