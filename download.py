@@ -91,7 +91,7 @@ def process_node(onezone, file_id, directory):
 def main():
     parser = argparse.ArgumentParser(description='Download whole space, folder or a file from Onedata')
     parser.add_argument("--onezone", default="https://datahub.egi.eu", type=str, help="Onezone hostname with protocol (default https://datahub.egi.eu)")
-    parser.add_argument("file_id", type=str, help="File ID of space, directory or file which should be downloaded")
+    parser.add_argument("file_id", type=str, help="File ID of shared space, directory or file")
     args = parser.parse_args()
 
     process_node(args.onezone, args.file_id, ".")

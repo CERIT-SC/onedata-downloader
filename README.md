@@ -1,4 +1,4 @@
-Python script by which you can download Onedata space with all its content. 
+Python script by which you can download shared Onedata space with all its content. Also a directory or file can be downloaded.
 
 Requirements:
 - Python 3
