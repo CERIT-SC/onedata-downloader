@@ -9,15 +9,21 @@ https://www.python.org/downloads/
 
 Module requests can be installed by commands
 
- pip3 install requests
+```
+pip3 install requests
+```
 
 Script can be run by commands
 
- python3 download.py FILE_ID
+```
+python3 download.py FILE_ID
+```
 
 or
 
- ./download.py FILE_ID
+```
+./download.py FILE_ID
+```
 
 Arguments:
 ```
