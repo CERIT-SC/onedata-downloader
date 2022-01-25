@@ -63,9 +63,9 @@ def process_node(onezone, file_id, directory):
     """
     Process given node (directory or file).
     """
-    LENGTH_OF_FILE_ID = 269
+    LENGTH_OF_FILE_ID = 268
     # check file_id
-    if len(file_id) == LENGTH_OF_FILE_ID:
+    if len(file_id) != LENGTH_OF_FILE_ID:
         print("Error: it seems that the given file id has incorrect length")
         return
 
