@@ -1,49 +1,47 @@
 #!/usr/bin/env python3
 
 """
-Python script which can download Onedata space or a directory recursively with all its content. 
+Python script by which you can download Onedata space with all its content. 
 
-Requirements:
-- Python 3
-- curl
 """
 
 import argparse
 import os
 import requests
-import subprocess
 
 def download_file(onezone, file_id, file_name, directory):
     """
     Download file with given file_id to given directory.
     """
     # don't download the file when it exists
+    print("Downloading file", directory + os.sep + file_name, end="... ")
     if not os.path.exists(directory + os.sep + file_name):
-        print("Downloading file", directory + os.sep + file_name)
         url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/content"
-        args = ["curl", "--output", directory + os.sep + file_name, "-sL", url]
-        process = subprocess.run(args, stdout=subprocess.PIPE)
-        if process.returncode == 0:
-            print("File", directory + os.sep + file_name, "downloaded")
+        request = requests.get(url, allow_redirects=True)
+        if request.ok:
+            with open(directory + os.sep + file_name, 'wb') as file:
+                file.write(request.content)
+
+            print("ok")
         else:
-            print("Error when downloading file", directory + os.sep + file_name)
+            print("failed")
     else:
-        print("File", directory + os.sep + file_name, "exists, download skipped")
+        print("file exists, skipped")
 
 def process_directory(onezone, file_id, file_name, directory):
     """
     Process directory and recursively its content.
     """
     # don't create the the directory when it exists
+    print("Processing directory", directory + os.sep + file_name, end="... ")
     if not os.path.exists(directory + os.sep + file_name):
-        print("Creating directory", directory + os.sep + file_name)
+        print("created")
         os.mkdir(directory + os.sep + file_name)
     else:
-        print("Directory", directory + os.sep + file_name, "exists, not created")
+        print("directory exists, not created")
     
     # get content of new directory
     url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/children"
-
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
