@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Python script by which you can download Onedata space with all its content. 
+Python script by which you can download Onedata space or directory with all its content. Downloaded directories and files have to be shared in Onedata.
 
 """
 
