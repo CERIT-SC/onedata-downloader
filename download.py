@@ -15,6 +15,11 @@ except:
     print("pip install requests")
     exit()
 
+"""
+Verbosity level.
+"""
+VERBOSITY = 0
+
 def download_file(onezone, file_id, file_name, directory):
     """
     Download file with given file_id to given directory.
@@ -23,14 +28,20 @@ def download_file(onezone, file_id, file_name, directory):
     print("Downloading file", directory + os.sep + file_name, end="... ")
     if not os.path.exists(directory + os.sep + file_name):
         url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/content"
-        request = requests.get(url, allow_redirects=True)
-        if request.ok:
-            with open(directory + os.sep + file_name, 'wb') as file:
-                file.write(request.content)
-
-            print("ok")
+        response = requests.get(url, allow_redirects=True)
+        if response.ok:
+            try:
+                with open(directory + os.sep + file_name, 'wb') as file:
+                    file.write(response.content)
+                    print("ok")
+            except EnvironmentError as e:
+                print("failed, exception occured:", e.__class__.__name__)
+                if VERBOSITY > 0:
+                    print(str(e))
         else:
-            print("failed")
+            print("failed, HTTP response status code =", response.status_code)
+            if VERBOSITY > 0:
+                print(response.json())
     else:
         print("file exists, skipped")
 
@@ -56,19 +67,15 @@ def process_directory(onezone, file_id, file_name, directory):
         for child in response_json['children']:
             process_node(onezone, child['id'], directory + os.sep + file_name)
     else:
-        print("Error: failed to process directory " + file_name + ", file ID =")
-        print(file_id)
+        print("Error: failed to process directory", file_name)
+        if VERBOSITY > 0:
+            print("processed directory", file_name, " with File ID =", file_id)
+            print(response.json())
 
 def process_node(onezone, file_id, directory):
     """
     Process given node (directory or file).
     """
-    # LENGTH_OF_FILE_ID = 268
-    # check file_id
-    # if len(file_id) != LENGTH_OF_FILE_ID:
-    #     print("Error: it seems that the given file id has incorrect length")
-    #     return
-
     # get attributes of node (basic information)
     url = onezone + "/api/v3/onezone/shares/data/" + file_id
     response = requests.get(url)
@@ -83,16 +90,25 @@ def process_node(onezone, file_id, directory):
         elif node_type == "dir":
             process_directory(onezone, file_id, node_name, directory)
         else:
-            print("Error: unknown type of file:", node_type)
+            print("Error: unknown node type")
+            if VERBOSITY > 0:
+                print("returned node type", node_type, " of node with File ID =", file_id)
     else:
-        print("Error: failed to retrieve information about node (Does the node exist?). File ID =")
-        print(file_id)
+        print("Error: failed to retrieve information about node with File ID =", file_id)
+        print("The requested node may not exist.")
+        if VERBOSITY > 0:
+            print(response.json())
 
 def main():
-    parser = argparse.ArgumentParser(description='Download whole space, folder or a file from Onedata')
-    parser.add_argument("--onezone", default="https://datahub.egi.eu", type=str, help="Onezone hostname with protocol (default https://datahub.egi.eu)")
+    parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
+    parser.add_argument("--onezone", default="https://datahub.egi.eu", type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
+    parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbosity level - displaying debug information (default: 0)")
     parser.add_argument("file_id", type=str, help="File ID of shared space, directory or file")
     args = parser.parse_args()
+
+    # set up verbosity level
+    global VERBOSITY
+    VERBOSITY = args.verbose
 
     process_node(args.onezone, args.file_id, ".")
 
