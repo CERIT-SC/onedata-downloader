@@ -11,8 +11,9 @@ try:
     import requests
 except:
     print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
-    print("You can install it by command:")
+    print("You can try install it by command:")
     print("pip install requests")
+    print("or you can you can follow the steps described on https://cryo-em-docs.readthedocs.io/en/latest/user/download_all.html")
     exit()
 
 """
