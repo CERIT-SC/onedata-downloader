@@ -99,6 +99,16 @@ def process_node(onezone, file_id, directory):
         if VERBOSITY > 0:
             print(response.json())
 
+def clean_onezone(onezone):
+    """
+     Add protocol name if not specified.
+    """
+    if not onezone.startswith("https://") and not onezone.startswith("http://"):
+        onezone = "http://" + onezone
+        if VERBOSITY > 0:
+            print("Use Onezone", onezone)
+    return onezone
+
 def main():
     parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
     parser.add_argument("--onezone", default="https://datahub.egi.eu", type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
@@ -110,7 +120,8 @@ def main():
     global VERBOSITY
     VERBOSITY = args.verbose
 
-    process_node(args.onezone, args.file_id, ".")
+    onezone = clean_onezone(args.onezone)
+    process_node(onezone, args.file_id, ".")
 
 if __name__ == "__main__":
     main()
