@@ -136,7 +136,7 @@ def clean_onezone(onezone):
         print(response.json())
     
     if not response.ok:
-        print("Error: failure while connecting to Onezone")
+        print("Error: failure while connecting to Onezone:", onezone)
         exit()
 
     return onezone
