@@ -144,8 +144,8 @@ def clean_onezone(onezone):
 def main():
     parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
     parser.add_argument("-o", "--onezone", default=DEFAULT_ONEZONE, type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
-    parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbosity level - displaying debug information (default: 0)")
-    parser.add_argument("file_id", type=str, help="File ID of shared space, directory or file")
+    parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbose prints - displaying debug information")
+    parser.add_argument("file_id", type=str, help="File ID of shared space, directory or a file")
     args = parser.parse_args()
 
     # set up verbosity level
