@@ -21,14 +21,24 @@ Verbosity level.
 """
 VERBOSITY = 0
 
+"""
+Default Onezone service URL.
+"""
+DEFAULT_ONEZONE = "https://datahub.egi.eu"
+
+"""
+Onezone API address.
+"""
+ONEZONE_API = "/api/v3/onezone/"
+
 def download_file(onezone, file_id, file_name, directory):
     """
     Download file with given file_id to given directory.
     """
     # don't download the file when it exists
-    print("Downloading file", directory + os.sep + file_name, end="... ")
+    print("Downloading file", directory + os.sep + file_name, end="... ", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
-        url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/content"
+        url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
         response = requests.get(url, allow_redirects=True)
         if response.ok:
             try:
@@ -51,7 +61,7 @@ def process_directory(onezone, file_id, file_name, directory):
     Process directory and recursively its content.
     """
     # don't create the the directory when it exists
-    print("Processing directory", directory + os.sep + file_name, end="... ")
+    print("Processing directory", directory + os.sep + file_name, end="... ", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         print("created")
         os.mkdir(directory + os.sep + file_name)
@@ -59,7 +69,7 @@ def process_directory(onezone, file_id, file_name, directory):
         print("directory exists, not created")
     
     # get content of new directory
-    url = onezone + "/api/v3/onezone/shares/data/" + file_id + "/children"
+    url = onezone + ONEZONE_API + "shares/data/" + file_id + "/children"
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
@@ -78,7 +88,7 @@ def process_node(onezone, file_id, directory):
     Process given node (directory or file).
     """
     # get attributes of node (basic information)
-    url = onezone + "/api/v3/onezone/shares/data/" + file_id
+    url = onezone + ONEZONE_API + "shares/data/" + file_id
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
@@ -102,17 +112,38 @@ def process_node(onezone, file_id, directory):
 
 def clean_onezone(onezone):
     """
-     Add protocol name if not specified.
+    Clean and test of given Onezone service.
     """
+    # add protocol name if not specified
     if not onezone.startswith("https://") and not onezone.startswith("http://"):
         onezone = "http://" + onezone
+
+    if VERBOSITY > 0:
+        print("Use Onezone:", onezone)
+        
+    # test if such Onezone exists 
+    url = onezone + ONEZONE_API + "configuration"
+    try:
+        response = requests.get(url)
+    except Exception as e:
+        print("Error: failure while trying to communicate with Onezone:", onezone)
         if VERBOSITY > 0:
-            print("Use Onezone", onezone)
+            print(str(e))
+        exit()
+
+    if VERBOSITY > 0:
+        print("Onezone configuration:")
+        print(response.json())
+    
+    if not response.ok:
+        print("Error: failure while connecting to Onezone")
+        exit()
+
     return onezone
 
 def main():
     parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
-    parser.add_argument("--onezone", default="https://datahub.egi.eu", type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
+    parser.add_argument("-o", "--onezone", default=DEFAULT_ONEZONE, type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
     parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbosity level - displaying debug information (default: 0)")
     parser.add_argument("file_id", type=str, help="File ID of shared space, directory or file")
     args = parser.parse_args()
