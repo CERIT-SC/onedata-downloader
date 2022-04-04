@@ -62,11 +62,15 @@ def process_directory(onezone, file_id, file_name, directory):
     """
     # don't create the the directory when it exists
     print("Processing directory", directory + os.sep + file_name, end="... ", flush=True)
-    if not os.path.exists(directory + os.sep + file_name):
-        print("created")
-        os.mkdir(directory + os.sep + file_name)
-    else:
+    try:
+        os.mkdir(directory + os.sep + file_name, mode=0o777)
+        print("directory created")
+    except FileExistsError:
         print("directory exists, not created")
+    except FileNotFoundError as e:
+        print("failed, exception occured:", e.__class__.__name__)
+        if VERBOSITY > 0:
+            print(str(e))
     
     # get content of new directory
     url = onezone + ONEZONE_API + "shares/data/" + file_id + "/children"
