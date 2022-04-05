@@ -15,6 +15,7 @@ except:
     print("pip install requests")
     print("or you can you can follow the steps described on https://cryo-em-docs.readthedocs.io/en/latest/user/download_all.html")
     exit()
+from concurrent.futures import ThreadPoolExecutor
 
 """
 Verbosity level.
@@ -56,6 +57,15 @@ def download_file(onezone, file_id, file_name, directory):
     else:
         print("file exists, skipped")
 
+def run_tasks_in_parallel(tasks, max_workers=1):
+    """
+    Run given tasks in parallel.
+    """
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        running_tasks = [executor.submit(task) for task in tasks]
+        for running_task in running_tasks:
+            running_task.result()
+
 def process_directory(onezone, file_id, file_name, directory):
     """
     Process directory and recursively its content.
@@ -79,8 +89,12 @@ def process_directory(onezone, file_id, file_name, directory):
         response_json = response.json()
         
         # process child nodes
+        # WIP - tohle jeste nefunguje spravne
+        tasks = list()
         for child in response_json['children']:
-            process_node(onezone, child['id'], directory + os.sep + file_name)
+            tasks.append(lambda: process_node(onezone, child['id'], directory + os.sep + file_name))
+        
+        run_tasks_in_parallel(tasks)
     else:
         print("Error: failed to process directory", file_name)
         if VERBOSITY > 0:
