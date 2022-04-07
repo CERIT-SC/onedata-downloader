@@ -161,7 +161,11 @@ def main():
     VERBOSITY = args.verbose
 
     onezone = clean_onezone(args.onezone)
-    process_node(onezone, args.file_id, ".")
+    
+    try:
+        process_node(onezone, args.file_id, ".")
+    except KeyboardInterrupt as e:
+        print(" prematurely interrupted (" + e.__class__.__name__ + ")")
 
 if __name__ == "__main__":
     main()
