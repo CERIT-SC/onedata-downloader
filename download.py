@@ -135,9 +135,14 @@ def clean_onezone(onezone):
             print(str(e))
         exit()
 
-    if VERBOSITY > 0:
-        print("Onezone configuration:")
-        print(response.json())
+    try:
+        response_json = response.json()
+    except Exception as e:
+        print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
+        exit()
+        
+    verbose_print(1, "Onezone configuration:")
+    verbose_print(1, response_json)
     
     if not response.ok:
         print("Error: failure while connecting to Onezone:", onezone)
