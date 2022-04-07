@@ -31,6 +31,13 @@ Onezone API address.
 """
 ONEZONE_API = "/api/v3/onezone/"
 
+def verbose_print(level, *args, **kwargs):
+    """
+    Print only when VERBOSITY is equal or higher than given level.
+    """
+    if VERBOSITY >= level:
+        print(*args, **kwargs)
+
 def download_file(onezone, file_id, file_name, directory):
     """
     Download file with given file_id to given directory.
@@ -47,12 +54,10 @@ def download_file(onezone, file_id, file_name, directory):
                     print("ok")
             except EnvironmentError as e:
                 print("failed, exception occured:", e.__class__.__name__)
-                if VERBOSITY > 0:
-                    print(str(e))
+                verbose_print(1, str(e))
         else:
             print("failed, HTTP response status code =", response.status_code)
-            if VERBOSITY > 0:
-                print(response.json())
+            verbose_print(1, response.json())
     else:
         print("file exists, skipped")
 
@@ -69,8 +74,7 @@ def process_directory(onezone, file_id, file_name, directory):
         print("directory exists, not created")
     except FileNotFoundError as e:
         print("failed, exception occured:", e.__class__.__name__)
-        if VERBOSITY > 0:
-            print(str(e))
+        verbose_print(1, str(e))
     
     # get content of new directory
     url = onezone + ONEZONE_API + "shares/data/" + file_id + "/children"
@@ -83,9 +87,8 @@ def process_directory(onezone, file_id, file_name, directory):
             process_node(onezone, child['id'], directory + os.sep + file_name)
     else:
         print("Error: failed to process directory", file_name)
-        if VERBOSITY > 0:
-            print("processed directory", file_name, " with File ID =", file_id)
-            print(response.json())
+        verbose_print(1, "processed directory", file_name, " with File ID =", file_id)
+        verbose_print(1, response.json())
 
 def process_node(onezone, file_id, directory):
     """
@@ -106,13 +109,11 @@ def process_node(onezone, file_id, directory):
             process_directory(onezone, file_id, node_name, directory)
         else:
             print("Error: unknown node type")
-            if VERBOSITY > 0:
-                print("returned node type", node_type, " of node with File ID =", file_id)
+            verbose_print(1, "returned node type", node_type, " of node with File ID =", file_id)
     else:
         print("Error: failed to retrieve information about node with File ID =", file_id)
         print("The requested node may not exist.")
-        if VERBOSITY > 0:
-            print(response.json())
+        verbose_print(1, response.json())
 
 def clean_onezone(onezone):
     """
@@ -122,17 +123,15 @@ def clean_onezone(onezone):
     if not onezone.startswith("https://") and not onezone.startswith("http://"):
         onezone = "http://" + onezone
 
-    if VERBOSITY > 0:
-        print("Use Onezone:", onezone)
-        
+    verbose_print(1, "Use Onezone:", onezone)
+
     # test if such Onezone exists 
     url = onezone + ONEZONE_API + "configuration"
     try:
         response = requests.get(url)
     except Exception as e:
         print("Error: failure while trying to communicate with Onezone:", onezone)
-        if VERBOSITY > 0:
-            print(str(e))
+        verbose_print(1, str(e))
         exit()
 
     try:
