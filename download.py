@@ -149,9 +149,21 @@ def clean_onezone(onezone):
 
     return onezone
 
+def clean_directory(directory):
+    """
+    Test if given directory is correct.
+    """
+    # test if given directory exists
+    if not os.path.isdir(directory):
+        print("Error: output directory", directory, "does not exist")
+        exit()
+    
+    return directory
+
 def main():
     parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
     parser.add_argument("-o", "--onezone", default=DEFAULT_ONEZONE, type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
+    parser.add_argument("-d", "--directory", default=".", type=str, help="Output directory (default: current directory)")
     parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbose prints - displaying debug information")
     parser.add_argument("file_id", type=str, help="File ID of shared space, directory or a file")
     args = parser.parse_args()
@@ -161,9 +173,10 @@ def main():
     VERBOSITY = args.verbose
 
     onezone = clean_onezone(args.onezone)
+    directory = clean_directory(args.directory)
     
     try:
-        process_node(onezone, args.file_id, ".")
+        process_node(onezone, args.file_id, directory)
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
 
