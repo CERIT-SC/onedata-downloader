@@ -7,6 +7,7 @@ Python script by which you can download Onedata space or directory with all its 
 
 import argparse
 import os
+import sys
 try:
     import requests
 except:
@@ -14,7 +15,7 @@ except:
     print("You can try install it by command:")
     print("pip install requests")
     print("or you can you can follow the steps described on https://cryo-em-docs.readthedocs.io/en/latest/user/download_all.html")
-    exit()
+    sys.exit(1)
 
 """
 Verbosity level.
@@ -132,20 +133,19 @@ def clean_onezone(onezone):
     except Exception as e:
         print("Error: failure while trying to communicate with Onezone:", onezone)
         verbose_print(1, str(e))
-        exit()
+        sys.exit(1)
+
+    if not response.ok:
+        print("Error: failure while connecting to Onezone:", onezone)
+        sys.exit(1)
 
     try:
         response_json = response.json()
+        verbose_print(1, "Onezone configuration:")
+        verbose_print(1, response_json)
     except Exception as e:
         print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
-        exit()
-        
-    verbose_print(1, "Onezone configuration:")
-    verbose_print(1, response_json)
-    
-    if not response.ok:
-        print("Error: failure while connecting to Onezone:", onezone)
-        exit()
+        sys.exit(1)
 
     return onezone
 
@@ -156,8 +156,8 @@ def clean_directory(directory):
     # test if given directory exists
     if not os.path.isdir(directory):
         print("Error: output directory", directory, "does not exist")
-        exit()
-    
+        sys.exit(1)
+
     return directory
 
 def main():
@@ -179,6 +179,8 @@ def main():
         process_node(onezone, args.file_id, directory)
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    return_code = main()
+    sys.exit(return_code)
