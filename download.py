@@ -53,14 +53,18 @@ def download_file(onezone, file_id, file_name, directory):
                 with open(directory + os.sep + file_name, 'wb') as file:
                     file.write(response.content)
                     print("ok")
+                    return 0
             except EnvironmentError as e:
                 print("failed, exception occured:", e.__class__.__name__)
                 verbose_print(1, str(e))
+                return 2
         else:
             print("failed, HTTP response status code =", response.status_code)
             verbose_print(1, response.json())
+            return 2
     else:
         print("file exists, skipped")
+        return 0
 
 def process_directory(onezone, file_id, file_name, directory):
     """
@@ -76,20 +80,25 @@ def process_directory(onezone, file_id, file_name, directory):
     except FileNotFoundError as e:
         print("failed, exception occured:", e.__class__.__name__)
         verbose_print(1, str(e))
-    
+        return 2
+
     # get content of new directory
     url = onezone + ONEZONE_API + "shares/data/" + file_id + "/children"
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
-        
+
+        result = 0
         # process child nodes
         for child in response_json['children']:
-            process_node(onezone, child['id'], directory + os.sep + file_name)
+            result = process_node(onezone, child['id'], directory + os.sep + file_name) or result
+
+        return result
     else:
         print("Error: failed to process directory", file_name)
         verbose_print(1, "processed directory", file_name, " with File ID =", file_id)
         verbose_print(1, response.json())
+        return 2
 
 def process_node(onezone, file_id, directory):
     """
@@ -103,18 +112,23 @@ def process_node(onezone, file_id, directory):
         node_type = response_json["type"]
         node_name = response_json["name"]
 
+        result = 0
         # check if node is directory or folder
         if node_type == "reg":
-            download_file(onezone, file_id, node_name, directory)
+            result = download_file(onezone, file_id, node_name, directory) or result
         elif node_type == "dir":
-            process_directory(onezone, file_id, node_name, directory)
+            result = process_directory(onezone, file_id, node_name, directory) or result
         else:
             print("Error: unknown node type")
             verbose_print(1, "returned node type", node_type, " of node with File ID =", file_id)
+            return 2
+
+        return result
     else:
         print("Error: failed to retrieve information about node with File ID =", file_id)
         print("The requested node may not exist.")
         verbose_print(1, response.json())
+        return 1
 
 def clean_onezone(onezone):
     """
@@ -133,11 +147,11 @@ def clean_onezone(onezone):
     except Exception as e:
         print("Error: failure while trying to communicate with Onezone:", onezone)
         verbose_print(1, str(e))
-        sys.exit(1)
+        sys.exit(2)
 
     if not response.ok:
         print("Error: failure while connecting to Onezone:", onezone)
-        sys.exit(1)
+        sys.exit(2)
 
     try:
         response_json = response.json()
@@ -145,7 +159,7 @@ def clean_onezone(onezone):
         verbose_print(1, response_json)
     except Exception as e:
         print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
-        sys.exit(1)
+        sys.exit(2)
 
     return onezone
 
@@ -156,7 +170,7 @@ def clean_directory(directory):
     # test if given directory exists
     if not os.path.isdir(directory):
         print("Error: output directory", directory, "does not exist")
-        sys.exit(1)
+        sys.exit(2)
 
     return directory
 
@@ -174,12 +188,13 @@ def main():
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
-    
+
     try:
-        process_node(onezone, args.file_id, directory)
+        result = process_node(onezone, args.file_id, directory)
+        return result
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
-        return 1
+        return 2
 
 if __name__ == "__main__":
     return_code = main()
