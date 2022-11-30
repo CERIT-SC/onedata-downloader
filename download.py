@@ -99,7 +99,12 @@ def process_directory(onezone, file_id, file_name, directory):
         result = 0
         # process child nodes
         for child in response_json['children']:
-            result = process_node(onezone, child['id'], directory + os.sep + file_name) or result
+            # difference between Onezone version 20 and 21 in name of the key containing the file_id attribute
+            if "file_id" in child:
+                child_file_id = child['file_id']
+            else:
+                child_file_id = child['id']
+            result = process_node(onezone, child_file_id, directory + os.sep + file_name) or result
 
         return result
     else:
@@ -117,14 +122,14 @@ def process_node(onezone, file_id, directory):
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
-        node_type = response_json["type"]
+        node_type = response_json["type"].upper()
         node_name = response_json["name"]
 
         result = 0
         # check if node is directory or folder
-        if node_type == "reg":
+        if node_type == "REG" or node_type == "SYMLNK":
             result = download_file(onezone, file_id, node_name, directory) or result
-        elif node_type == "dir":
+        elif node_type == "DIR":
             result = process_directory(onezone, file_id, node_name, directory) or result
         else:
             print("Error: unknown node type")
