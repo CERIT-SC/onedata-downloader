@@ -18,7 +18,7 @@ except:
     sys.exit(1)
 
 """
-Verbosity level.
+Default verbosity level.
 """
 VERBOSITY = 0
 
@@ -28,7 +28,7 @@ Default Onezone service URL.
 DEFAULT_ONEZONE = "https://datahub.egi.eu"
 
 """
-Onezone API address.
+Used Onezone API URI.
 """
 ONEZONE_API = "/api/v3/onezone/"
 
@@ -43,9 +43,11 @@ def download_file(onezone, file_id, file_name, directory):
     """
     Download file with given file_id to given directory.
     """
+    verbose_print(2, "download_file(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't download the file when it exists
     print("Downloading file", directory + os.sep + file_name, end="... ", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
+        # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
         response = requests.get(url, allow_redirects=True)
         if response.ok:
@@ -78,6 +80,7 @@ def process_directory(onezone, file_id, file_name, directory):
     """
     Process directory and recursively its content.
     """
+    verbose_print(2, "process_directory(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't create the the directory when it exists
     print("Processing directory", directory + os.sep + file_name, end="... ", flush=True)
     try:
@@ -91,6 +94,7 @@ def process_directory(onezone, file_id, file_name, directory):
         return 2
 
     # get content of new directory
+    # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/list_children
     url = onezone + ONEZONE_API + "shares/data/" + file_id + "/children"
     response = requests.get(url)
     if response.ok:
@@ -117,7 +121,9 @@ def process_node(onezone, file_id, directory):
     """
     Process given node (directory or file).
     """
-    # get attributes of node (basic information)
+    verbose_print(2, "process_node(%s, %s, %s)" % (onezone, file_id, directory))
+    # get basic node's attributes
+    # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/get_attrs
     url = onezone + ONEZONE_API + "shares/data/" + file_id
     response = requests.get(url)
     if response.ok:
@@ -134,12 +140,13 @@ def process_node(onezone, file_id, directory):
         else:
             print("Error: unknown node type")
             verbose_print(1, "returned node type", node_type, " of node with File ID =", file_id)
+            verbose_print(1, response.json())
             return 2
 
         return result
     else:
-        print("Error: failed to retrieve information about node with File ID =", file_id)
-        print("The requested node may not exist.")
+        print("Error: failed to retrieve information about the node. The requested node may not exist.")
+        verbose_print(1, "requested node File ID =", file_id)
         verbose_print(1, response.json())
         return 1
 
@@ -173,6 +180,10 @@ def clean_onezone(onezone):
     except Exception as e:
         print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
         sys.exit(2)
+
+    # get Onezone version
+    onezone_version = response_json['version'].split(".")[0] # 21.02.0-alpha28 -> 21
+    verbose_print(1, "Onezone version:", onezone_version)
 
     return onezone
 
