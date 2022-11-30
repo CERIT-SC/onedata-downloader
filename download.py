@@ -59,7 +59,15 @@ def download_file(onezone, file_id, file_name, directory):
                 verbose_print(1, str(e))
                 return 2
         else:
-            print("failed, HTTP response status code =", response.status_code)
+            print("failed", end="")
+            response_json = response.json()
+            if "error" in response_json and "details" in response_json["error"] and "errno" in response_json["error"]["details"] and "eacces" in response_json["error"]["details"]["errno"]:
+                print(", response error: permission denied")
+            elif "error" in response_json and "details" in response_json["error"] and "errno" in response_json["error"]["details"] and "enoent" in response_json["error"]["details"]["errno"]:
+                print(", response error: no such file or directory")
+            else:
+                print(", returned HTTP response code =", response.status_code)
+
             verbose_print(1, response.json())
             return 2
     else:
