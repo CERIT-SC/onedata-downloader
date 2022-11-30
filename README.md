@@ -1,13 +1,13 @@
-Python script by which you can download shared Onedata space with all its content. Also a directory or a single file can be downloaded.
+Python script by which you can download content of Onedata Share. The script can download whole directory recursively or also a single file.
 
 Requirements:
 - Python 3
-- Python module requests
+- Python module `requests`
 
 Python 3 can be installed from URL
 https://www.python.org/downloads/
 
-Module requests can be installed by commands
+Module requests can be installed by command
 
 ```
 pip3 install requests
@@ -25,17 +25,22 @@ or
 ./download.py FILE_ID
 ```
 
-FILE_ID is a string which can be obtained from a Onedata share web page. 
+`FILE_ID` is a string which can be obtained from a web page of the Onedata Share. The `File ID` is listed in `File Details` window accessible by
+- click on the icon of the desired node (directory or file), 
+- right click on the node and choosing menu item `Information`.
 
 Arguments:
 ```
 positional arguments:
-  file_id            File ID of shared space, directory or a file
+  file_id               File ID of shared space, directory or a file
 
-optional arguments:
-  -o, --onezone ONEZONE  Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)
-  -v, --verbose          Set verbose prints - displaying debug information
-  -h, --help             Show this help message and exit
+options:
+  -h, --help            show this help message and exit
+  -o ONEZONE, --onezone ONEZONE
+                        Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)
+  -d DIRECTORY, --directory DIRECTORY
+                        Output directory (default: current directory)
+  -v, --verbose         Set verbose prints - displaying debug information
 ```
 
 Examples:
@@ -47,4 +52,9 @@ or with a Onezone specified
 
 ```
 ./download.py --onezone https://datahub.egi.eu  00000000007E6C76736861726547756964233039383266613462303663623832666666623932633661366363396433636432636837353962233037646231353336326536646363363633393039396136613030383537643738636832366538233134613830313936336235363761656533376665396536633536666434636235636834653138
+```
+
+You can call the script directly from the repository by
+```
+curl -s https://raw.githubusercontent.com/CERIT-SC/onedata-downloader/master/download.py | python3 - 00000000007E6C76736861726547756964233039383266613462303663623832666666623932633661366363396433636432636837353962233037646231353336326536646363363633393039396136613030383537643738636832366538233134613830313936336235363761656533376665396536633536666434636235636834653138
 ```
