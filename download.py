@@ -8,6 +8,7 @@ Python script by which you can download Onedata space or directory with all its 
 import argparse
 import os
 import sys
+
 try:
     import requests
 except:
@@ -33,12 +34,14 @@ Used Onezone API URI.
 """
 ONEZONE_API = "/api/v3/onezone/"
 
+
 def verbose_print(level, *args, **kwargs):
     """
     Print only when VERBOSITY is equal or higher than given level.
     """
     if VERBOSITY >= level:
         print(*args, **kwargs)
+
 
 def download_file(onezone, file_id, file_name, directory):
     """
@@ -53,7 +56,7 @@ def download_file(onezone, file_id, file_name, directory):
         response = requests.get(url, allow_redirects=True)
         if response.ok:
             try:
-                with open(directory + os.sep + file_name, 'wb') as file:
+                with open(directory + os.sep + file_name, "wb") as file:
                     file.write(response.content)
                     print("ok")
                     return 0
@@ -64,9 +67,19 @@ def download_file(onezone, file_id, file_name, directory):
         else:
             print("failed", end="")
             response_json = response.json()
-            if "error" in response_json and "details" in response_json["error"] and "errno" in response_json["error"]["details"] and "eacces" in response_json["error"]["details"]["errno"]:
+            if (
+                "error" in response_json
+                and "details" in response_json["error"]
+                and "errno" in response_json["error"]["details"]
+                and "eacces" in response_json["error"]["details"]["errno"]
+            ):
                 print(", response error: permission denied")
-            elif "error" in response_json and "details" in response_json["error"] and "errno" in response_json["error"]["details"] and "enoent" in response_json["error"]["details"]["errno"]:
+            elif (
+                "error" in response_json
+                and "details" in response_json["error"]
+                and "errno" in response_json["error"]["details"]
+                and "enoent" in response_json["error"]["details"]["errno"]
+            ):
                 print(", response error: no such file or directory")
             else:
                 print(", returned HTTP response code =", response.status_code)
@@ -76,6 +89,7 @@ def download_file(onezone, file_id, file_name, directory):
     else:
         print("file exists, skipped")
         return 0
+
 
 def process_directory(onezone, file_id, file_name, directory):
     """
@@ -103,12 +117,12 @@ def process_directory(onezone, file_id, file_name, directory):
 
         result = 0
         # process child nodes
-        for child in response_json['children']:
+        for child in response_json["children"]:
             # difference between Onezone version 20 and 21 in name of the key containing the file_id attribute
             if "file_id" in child:
-                child_file_id = child['file_id']
+                child_file_id = child["file_id"]
             else:
-                child_file_id = child['id']
+                child_file_id = child["id"]
             result = process_node(onezone, child_file_id, directory + os.sep + file_name) or result
 
         return result
@@ -117,6 +131,7 @@ def process_directory(onezone, file_id, file_name, directory):
         verbose_print(1, "processed directory", file_name, " with File ID =", file_id)
         verbose_print(1, response.json())
         return 2
+
 
 def process_node(onezone, file_id, directory):
     """
@@ -146,10 +161,13 @@ def process_node(onezone, file_id, directory):
 
         return result
     else:
-        print("Error: failed to retrieve information about the node. The requested node may not exist.")
+        print(
+            "Error: failed to retrieve information about the node. The requested node may not exist."
+        )
         verbose_print(1, "requested node File ID =", file_id)
         verbose_print(1, response.json())
         return 1
+
 
 def clean_onezone(onezone):
     """
@@ -161,7 +179,7 @@ def clean_onezone(onezone):
 
     verbose_print(1, "Use Onezone:", onezone)
 
-    # test if such Onezone exists 
+    # test if such Onezone exists
     url = onezone + ONEZONE_API + "configuration"
     try:
         response = requests.get(url)
@@ -183,10 +201,11 @@ def clean_onezone(onezone):
         sys.exit(2)
 
     # get Onezone version
-    onezone_version = response_json['version'].split(".")[0] # 21.02.0-alpha28 -> 21
+    onezone_version = response_json["version"].split(".")[0]  # 21.02.0-alpha28 -> 21
     verbose_print(1, "Onezone version:", onezone_version)
 
     return onezone
+
 
 def clean_directory(directory):
     """
@@ -199,11 +218,32 @@ def clean_directory(directory):
 
     return directory
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Download whole shared space, directory or a single file from Onedata Oneprovider.')
-    parser.add_argument("-o", "--onezone", default=DEFAULT_ONEZONE, type=str, help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)")
-    parser.add_argument("-d", "--directory", default=".", type=str, help="Output directory (default: current directory)")
-    parser.add_argument("-v", "--verbose", action='count', default=0, help="Set verbose prints - displaying debug information")
+    parser = argparse.ArgumentParser(
+        description="Download whole shared space, directory or a single file from Onedata Oneprovider."
+    )
+    parser.add_argument(
+        "-o",
+        "--onezone",
+        default=DEFAULT_ONEZONE,
+        type=str,
+        help="Onedata Onezone URL with specified protocol (default: https://datahub.egi.eu)",
+    )
+    parser.add_argument(
+        "-d",
+        "--directory",
+        default=".",
+        type=str,
+        help="Output directory (default: current directory)",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Set verbose prints - displaying debug information",
+    )
     parser.add_argument("file_id", type=str, help="File ID of shared space, directory or a file")
     args = parser.parse_args()
 
@@ -220,6 +260,7 @@ def main():
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
         return 2
+
 
 if __name__ == "__main__":
     return_code = main()
