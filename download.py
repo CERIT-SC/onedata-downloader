@@ -14,7 +14,8 @@ except:
     print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
     print("You can try install it by command:")
     print("pip install requests")
-    print("or you can you can follow the steps described on https://cryo-em-docs.readthedocs.io/en/latest/user/download_all.html")
+    print("or you can you can follow the steps described on:")
+    print("https://fs2od.readthedocs.io/en/latest/user/download_all.html")
     sys.exit(1)
 
 """
