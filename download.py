@@ -57,7 +57,7 @@ def download_file(onezone, file_id, file_name, directory):
             if request.ok:
                 try:
                     with open(directory + os.sep + file_name, "wb") as file:
-                        for chunk in r.iter_content(chunk_size=8192):
+                        for chunk in request.iter_content(chunk_size=8192):
                             file.write(chunk)
                         print("ok")
                         return 0
