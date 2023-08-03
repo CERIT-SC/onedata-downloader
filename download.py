@@ -53,39 +53,40 @@ def download_file(onezone, file_id, file_name, directory):
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
-        response = requests.get(url, allow_redirects=True)
-        if response.ok:
-            try:
-                with open(directory + os.sep + file_name, "wb") as file:
-                    file.write(response.content)
-                    print("ok")
-                    return 0
-            except EnvironmentError as e:
-                print("failed, exception occured:", e.__class__.__name__)
-                verbose_print(1, str(e))
-                return 2
-        else:
-            print("failed", end="")
-            response_json = response.json()
-            if (
-                "error" in response_json
-                and "details" in response_json["error"]
-                and "errno" in response_json["error"]["details"]
-                and "eacces" in response_json["error"]["details"]["errno"]
-            ):
-                print(", response error: permission denied")
-            elif (
-                "error" in response_json
-                and "details" in response_json["error"]
-                and "errno" in response_json["error"]["details"]
-                and "enoent" in response_json["error"]["details"]["errno"]
-            ):
-                print(", response error: no such file or directory")
+        with requests.get(url, allow_redirects=True, stream=True) as request:
+            if request.ok:
+                try:
+                    with open(directory + os.sep + file_name, "wb") as file:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            file.write(chunk)
+                        print("ok")
+                        return 0
+                except EnvironmentError as e:
+                    print("failed, exception occured:", e.__class__.__name__)
+                    verbose_print(1, str(e))
+                    return 2
             else:
-                print(", returned HTTP response code =", response.status_code)
+                print("failed", end="")
+                response_json = response.json()
+                if (
+                    "error" in response_json
+                    and "details" in response_json["error"]
+                    and "errno" in response_json["error"]["details"]
+                    and "eacces" in response_json["error"]["details"]["errno"]
+                ):
+                    print(", response error: permission denied")
+                elif (
+                    "error" in response_json
+                    and "details" in response_json["error"]
+                    and "errno" in response_json["error"]["details"]
+                    and "enoent" in response_json["error"]["details"]["errno"]
+                ):
+                    print(", response error: no such file or directory")
+                else:
+                    print(", returned HTTP response code =", response.status_code)
 
-            verbose_print(1, response.json())
-            return 2
+                verbose_print(1, response.json())
+                return 2
     else:
         print("file exists, skipped")
         return 0
