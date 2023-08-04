@@ -34,6 +34,39 @@ Used Onezone API URI.
 """
 ONEZONE_API = "/api/v3/onezone/"
 
+"""
+Chunk size for downloading files as stream.
+"""
+CHUNK_SIZE = 33_554_432
+
+
+def convert_chunk_size(chunk_size: str) -> int:
+    """
+    Converts user-given chunk size to integer.
+    User can input values as number (bytes) or number + unit (eg. 32M)
+    """
+    chunk_size = chunk_size.strip()
+    unit = "b"
+    if chunk_size[-1].isalpha():
+        unit = chunk_size[-1]
+        chunk_size = chunk_size[:-1]
+    
+    try:
+        chunk_size = int(chunk_size)
+    except ValueError as e:
+        print("failed while converting size to integer, exception occured:", e.__class__.__name__)
+        return -1
+    
+    units = ("b", "k", "M", "G")
+    if unit not in units:
+        print("failed while converting mapping unit, unit is not in the right format")
+        return -1
+    
+    unit_power = units.index(unit)
+    chunk_size = chunk_size * (1024 ** unit_power)
+
+    return chunk_size
+
 
 def verbose_print(level, *args, **kwargs):
     """
@@ -53,39 +86,40 @@ def download_file(onezone, file_id, file_name, directory):
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
-        response = requests.get(url, allow_redirects=True)
-        if response.ok:
-            try:
-                with open(directory + os.sep + file_name, "wb") as file:
-                    file.write(response.content)
-                    print("ok")
-                    return 0
-            except EnvironmentError as e:
-                print("failed, exception occured:", e.__class__.__name__)
-                verbose_print(1, str(e))
-                return 2
-        else:
-            print("failed", end="")
-            response_json = response.json()
-            if (
-                "error" in response_json
-                and "details" in response_json["error"]
-                and "errno" in response_json["error"]["details"]
-                and "eacces" in response_json["error"]["details"]["errno"]
-            ):
-                print(", response error: permission denied")
-            elif (
-                "error" in response_json
-                and "details" in response_json["error"]
-                and "errno" in response_json["error"]["details"]
-                and "enoent" in response_json["error"]["details"]["errno"]
-            ):
-                print(", response error: no such file or directory")
+        with requests.get(url, allow_redirects=True, stream=True) as request:
+            if request.ok:
+                try:
+                    with open(directory + os.sep + file_name, "wb") as file:
+                        for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
+                            file.write(chunk)
+                        print("ok")
+                        return 0
+                except EnvironmentError as e:
+                    print("failed, exception occured:", e.__class__.__name__)
+                    verbose_print(1, str(e))
+                    return 2
             else:
-                print(", returned HTTP response code =", response.status_code)
+                print("failed", end="")
+                response_json = response.json()
+                if (
+                    "error" in response_json
+                    and "details" in response_json["error"]
+                    and "errno" in response_json["error"]["details"]
+                    and "eacces" in response_json["error"]["details"]["errno"]
+                ):
+                    print(", response error: permission denied")
+                elif (
+                    "error" in response_json
+                    and "details" in response_json["error"]
+                    and "errno" in response_json["error"]["details"]
+                    and "enoent" in response_json["error"]["details"]["errno"]
+                ):
+                    print(", response error: no such file or directory")
+                else:
+                    print(", returned HTTP response code =", response.status_code)
 
-            verbose_print(1, response.json())
-            return 2
+                verbose_print(1, response.json())
+                return 2
     else:
         print("file exists, skipped")
         return 0
@@ -238,6 +272,13 @@ def main():
         help="Output directory (default: current directory)",
     )
     parser.add_argument(
+        "-c",
+        "--chunk-size",
+        default="32M",
+        type=str,
+        help="Chunk size for downloading. Value can be in bytes, or a number with unit (eg. 16k, 32M, 2G)"
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -250,6 +291,11 @@ def main():
     # set up verbosity level
     global VERBOSITY
     VERBOSITY = args.verbose
+
+    global CHUNK_SIZE
+    CHUNK_SIZE = convert_chunk_size(args.chunk_size)
+    if CHUNK_SIZE < 0:
+        return 3
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
