@@ -16,7 +16,7 @@ except:
     print("You can try install it by command:")
     print("pip install requests")
     print("or you can you can follow the steps described on:")
-    print("https://fs2od.readthedocs.io/en/latest/user/download_all.html")
+    print("https://onedata4sci.readthedocs.io/en/latest/user/onedata-downloader.html")
     sys.exit(1)
 
 """
@@ -50,20 +50,20 @@ def convert_chunk_size(chunk_size: str) -> int:
     if chunk_size[-1].isalpha():
         unit = chunk_size[-1]
         chunk_size = chunk_size[:-1]
-    
+
     try:
         chunk_size = int(chunk_size)
     except ValueError as e:
         print("failed while converting size to integer, exception occured:", e.__class__.__name__)
         return -1
-    
+
     units = ("b", "k", "M", "G")
     if unit not in units:
         print("failed while converting mapping unit, unit is not in the right format")
         return -1
-    
+
     unit_power = units.index(unit)
-    chunk_size = chunk_size * (1024 ** unit_power)
+    chunk_size = chunk_size * (1024**unit_power)
 
     return chunk_size
 
