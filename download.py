@@ -9,6 +9,7 @@ import argparse
 import os
 import sys
 import random
+import re
 
 try:
     import requests
@@ -84,6 +85,24 @@ def generate_random_string(size: int = 16) -> str:
     characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
     random_string = "".join(random.choices(characters, k=size))
     return random_string
+
+
+def remove_part_files(directory_to_search: str) -> bool:
+    """
+    Removes files in tree with extension defined by global value PART_FILE_EXTENSION
+    """
+    pattern = ".*\\" + PART_FILE_EXTENSION + "$"
+    try:
+        for root, directories, files in os.walk(directory_to_search):
+            for actual_file in files:
+                if re.match(pattern, actual_file):
+                    print("Part file found - removing, path:", root + os.sep + actual_file)
+                    os.remove(os.path.join(root, actual_file))
+    except Exception as e:
+        print("failed while removing part files, exception occured:", e.__class__.__name__)
+        return False
+    
+    return True
 
 
 def verbose_print(level, *args, **kwargs):
@@ -317,6 +336,10 @@ def main():
     CHUNK_SIZE = convert_chunk_size(args.chunk_size)
     if CHUNK_SIZE < 0:
         return 3
+
+    status = remove_part_files(args.directory)
+    if not status:
+        return 4
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
