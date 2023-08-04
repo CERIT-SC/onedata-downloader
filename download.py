@@ -8,6 +8,7 @@ Python script by which you can download Onedata space or directory with all its 
 import argparse
 import os
 import sys
+import random
 
 try:
     import requests
@@ -39,6 +40,11 @@ Chunk size for downloading files as stream.
 """
 CHUNK_SIZE = 33_554_432
 
+"""
+File extension of not yet completely downloaded (part) file.
+"""
+PART_FILE_EXTENSION = ".oddown_part"
+
 
 def convert_chunk_size(chunk_size: str) -> int:
     """
@@ -68,6 +74,18 @@ def convert_chunk_size(chunk_size: str) -> int:
     return chunk_size
 
 
+def generate_random_string(size: int = 16) -> str:
+    """
+    Generates random string of characters of given size
+    """
+    if size < 0:
+        return ""
+
+    characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
+    random_string = "".join(random.choices(characters, k=size))
+    return random_string
+
+
 def verbose_print(level, *args, **kwargs):
     """
     Print only when VERBOSITY is equal or higher than given level.
@@ -82,18 +100,21 @@ def download_file(onezone, file_id, file_name, directory):
     """
     verbose_print(2, "download_file(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't download the file when it exists
-    print("Downloading file", directory + os.sep + file_name, end="... ", flush=True)
+    random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
+    print("Downloading file", directory + os.sep + file_name, "with filename", random_filename , end="... ", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
         with requests.get(url, allow_redirects=True, stream=True) as request:
             if request.ok:
                 try:
-                    with open(directory + os.sep + file_name, "wb") as file:
+                    with open(directory + os.sep + random_filename, "wb") as file:
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
-                        print("ok")
-                        return 0
+                    print("downloaded", end=" ")
+                    os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
+                    print("and renamed - ok")
+                    return 0
                 except EnvironmentError as e:
                     print("failed, exception occured:", e.__class__.__name__)
                     verbose_print(1, str(e))
