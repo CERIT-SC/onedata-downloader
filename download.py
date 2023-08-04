@@ -8,6 +8,8 @@ Python script by which you can download Onedata space or directory with all its 
 import argparse
 import os
 import sys
+import random
+import re
 
 try:
     import requests
@@ -39,6 +41,11 @@ Chunk size for downloading files as stream.
 """
 CHUNK_SIZE = 33_554_432
 
+"""
+File extension of not yet completely downloaded (part) file.
+"""
+PART_FILE_EXTENSION = ".oddown_part"
+
 
 def convert_chunk_size(chunk_size: str) -> int:
     """
@@ -68,6 +75,36 @@ def convert_chunk_size(chunk_size: str) -> int:
     return chunk_size
 
 
+def generate_random_string(size: int = 16) -> str:
+    """
+    Generates random string of characters of given size
+    """
+    if size < 0:
+        return ""
+
+    characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
+    random_string = "".join(random.choices(characters, k=size))
+    return random_string
+
+
+def remove_part_files(directory_to_search: str) -> bool:
+    """
+    Removes files in tree with extension defined by global value PART_FILE_EXTENSION
+    """
+    pattern = ".*\\" + PART_FILE_EXTENSION + "$"
+    try:
+        for root, directories, files in os.walk(directory_to_search):
+            for actual_file in files:
+                if re.match(pattern, actual_file):
+                    os.remove(os.path.join(root, actual_file))
+                    print("Partially downloaded file", root + os.sep + actual_file, "removed")
+    except Exception as e:
+        print("failed while removing part files, exception occured:", e.__class__.__name__)
+        return False
+
+    return True
+
+
 def verbose_print(level, *args, **kwargs):
     """
     Print only when VERBOSITY is equal or higher than given level.
@@ -82,18 +119,23 @@ def download_file(onezone, file_id, file_name, directory):
     """
     verbose_print(2, "download_file(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't download the file when it exists
-    print("Downloading file", directory + os.sep + file_name, end="... ", flush=True)
+    random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
+    print("Downloading file", directory + os.sep + file_name, end="")
+    verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
+    print("... ", end="", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
         with requests.get(url, allow_redirects=True, stream=True) as request:
             if request.ok:
                 try:
-                    with open(directory + os.sep + file_name, "wb") as file:
+                    with open(directory + os.sep + random_filename, "wb") as file:
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
-                        print("ok")
-                        return 0
+                    os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
+                    verbose_print(2, "(renamed) ", end="")
+                    print("ok")
+                    return 0
                 except EnvironmentError as e:
                     print("failed, exception occured:", e.__class__.__name__)
                     verbose_print(1, str(e))
@@ -276,7 +318,7 @@ def main():
         "--chunk-size",
         default="32M",
         type=str,
-        help="Chunk size for downloading. Value can be in bytes, or a number with unit (eg. 16k, 32M, 2G)"
+        help="The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit (e.g. 16k, 32M, 2G)",
     )
     parser.add_argument(
         "-v",
@@ -296,6 +338,10 @@ def main():
     CHUNK_SIZE = convert_chunk_size(args.chunk_size)
     if CHUNK_SIZE < 0:
         return 3
+
+    status = remove_part_files(args.directory)
+    if not status:
+        return 4
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
