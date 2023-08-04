@@ -96,12 +96,12 @@ def remove_part_files(directory_to_search: str) -> bool:
         for root, directories, files in os.walk(directory_to_search):
             for actual_file in files:
                 if re.match(pattern, actual_file):
-                    print("Part file found - removing, path:", root + os.sep + actual_file)
                     os.remove(os.path.join(root, actual_file))
+                    print("Partially downloaded file", root + os.sep + actual_file, "removed")
     except Exception as e:
         print("failed while removing part files, exception occured:", e.__class__.__name__)
         return False
-    
+
     return True
 
 
@@ -120,7 +120,9 @@ def download_file(onezone, file_id, file_name, directory):
     verbose_print(2, "download_file(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't download the file when it exists
     random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
-    print("Downloading file", directory + os.sep + file_name, "with filename", random_filename , end="... ", flush=True)
+    print("Downloading file", directory + os.sep + file_name, end="")
+    verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
+    print("... ", end="", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
@@ -130,9 +132,9 @@ def download_file(onezone, file_id, file_name, directory):
                     with open(directory + os.sep + random_filename, "wb") as file:
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
-                    print("downloaded", end=" ")
                     os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
-                    print("and renamed - ok")
+                    verbose_print(2, "(renamed) ", end="")
+                    print("ok")
                     return 0
                 except EnvironmentError as e:
                     print("failed, exception occured:", e.__class__.__name__)
@@ -316,7 +318,7 @@ def main():
         "--chunk-size",
         default="32M",
         type=str,
-        help="Chunk size for downloading. Value can be in bytes, or a number with unit (eg. 16k, 32M, 2G)"
+        help="The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit (e.g. 16k, 32M, 2G)",
     )
     parser.add_argument(
         "-v",
