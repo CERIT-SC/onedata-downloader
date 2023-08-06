@@ -269,6 +269,11 @@ def process_node(onezone, file_id, directory):
         # check if node is directory or folder
         if node_type == "REG" or node_type == "SYMLNK":
             ALL_FILES += 1
+            if os.path.exists(os.path.join(directory, node_name)):
+                EXISTENT_FILES.put(os.path.join(directory, node_name))
+                print("File", directory + os.sep + node_name, "exists, skipped")
+                return 0
+
             verbose_print(1, "Adding file to queue", directory + os.sep + node_name)
             file_queue.put((onezone, file_id, node_name, directory))
         elif node_type == "DIR":
@@ -350,10 +355,6 @@ def thread_worker(thread_number: int):
 
 
 def print_download_statistics(directory_to_search: str, finished: bool = True):
-    #EXISTENT_FILES = queue.Queue()
-    #FINISHED_FILES = queue.Queue()
-    #PART_FILES = queue.Queue()
-
     existent_files = EXISTENT_FILES.qsize()
     finished_files = FINISHED_FILES.qsize()
 
