@@ -386,9 +386,11 @@ def main():
     directory = clean_directory(args.directory)
 
     try:
+        print("starting creating folder structure")
         result = process_node(onezone, args.file_id, directory)
         if result:
             return result
+        print("folder structure created")
         
         for thread_number in range(THREADS_NUMBER):
             result = threading.Thread(target=thread_worker, args=(thread_number, ), daemon=True).start() or result
