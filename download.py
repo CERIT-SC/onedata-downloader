@@ -53,6 +53,18 @@ Threads number for parallel downloading.
 """
 THREADS_NUMBER = 1
 
+ROOT_DIRECTORY_SIZE = 0
+
+ALL_DIRECTORIES = 0
+DIRECTORIES_CREATED = 0
+DIRECTORIES_NOT_CREATED_OS_ERROR = 0
+
+ALL_FILES = 0
+EXISTENT_FILES = queue.Queue()
+FINISHED_FILES = queue.Queue()
+PART_FILES = queue.Queue()
+
+
 file_queue = queue.Queue()
 
 
@@ -139,10 +151,12 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
         with requests.get(url, allow_redirects=True, stream=True) as request:
             if request.ok:
                 try:
+                    PART_FILES.put(os.path.join(directory, random_filename))
                     with open(directory + os.sep + random_filename, "wb") as file:
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
                     os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
+                    FINISHED_FILES.put(os.path.join(directory, file_name))
                     verbose_print(2, f"Thread {thread_number}", random_filename, "renamed to", directory + os.sep + file_name)
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
                     print(f"Downloading of", directory + os.sep + file_name, "ok")
@@ -178,6 +192,7 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                 verbose_print(1, f"Thread {thread_number}:", response.json())
                 return 2
     else:
+        EXISTENT_FILES.put(os.path.join(directory, file_name))
         verbose_print(1, f"Thread {thread_number}:", end=" ")
         print("File", directory + os.sep + file_name, "exists, skipped")
         return 0
@@ -188,14 +203,19 @@ def process_directory(onezone, file_id, file_name, directory):
     Process directory and recursively its content.
     """
     verbose_print(2, "process_directory(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
+    global ALL_DIRECTORIES
+    global DIRECTORIES_CREATED
+    global DIRECTORIES_NOT_CREATED_OS_ERROR
     # don't create the the directory when it exists
     print("Processing directory", directory + os.sep + file_name, end="... ", flush=True)
     try:
         os.mkdir(directory + os.sep + file_name, mode=0o777)
+        DIRECTORIES_CREATED += 1
         print("directory created")
     except FileExistsError:
         print("directory exists, not created")
     except FileNotFoundError as e:
+        DIRECTORIES_NOT_CREATED_OS_ERROR += 1
         print("failed, exception occured:", e.__class__.__name__)
         verbose_print(1, str(e))
         return 2
@@ -206,7 +226,6 @@ def process_directory(onezone, file_id, file_name, directory):
     response = requests.get(url)
     if response.ok:
         response_json = response.json()
-
         result = 0
         # process child nodes
         for child in response_json["children"]:
@@ -230,6 +249,9 @@ def process_node(onezone, file_id, directory):
     Process given node (directory or file).
     """
     verbose_print(2, "process_node(%s, %s, %s)" % (onezone, file_id, directory))
+    global ROOT_DIRECTORY_SIZE
+    global ALL_FILES
+    global ALL_DIRECTORIES
     # get basic node's attributes
     # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/get_attrs
     url = onezone + ONEZONE_API + "shares/data/" + file_id
@@ -238,13 +260,19 @@ def process_node(onezone, file_id, directory):
         response_json = response.json()
         node_type = response_json["type"].upper()
         node_name = response_json["name"]
+        node_size = response_json["size"]
+
+        if node_size > ROOT_DIRECTORY_SIZE:
+            ROOT_DIRECTORY_SIZE = node_size
 
         result = 0
         # check if node is directory or folder
         if node_type == "REG" or node_type == "SYMLNK":
+            ALL_FILES += 1
             verbose_print(1, "Adding file to queue", directory + os.sep + node_name)
             file_queue.put((onezone, file_id, node_name, directory))
         elif node_type == "DIR":
+            ALL_DIRECTORIES += 1
             result = process_directory(onezone, file_id, node_name, directory) or result
         else:
             print("Error: unknown node type")
@@ -321,6 +349,41 @@ def thread_worker(thread_number: int):
     return result
 
 
+def print_download_statistics(directory_to_search: str, finished: bool = True):
+    #EXISTENT_FILES = queue.Queue()
+    #FINISHED_FILES = queue.Queue()
+    #PART_FILES = queue.Queue()
+
+    existent_files = EXISTENT_FILES.qsize()
+    finished_files = FINISHED_FILES.qsize()
+
+    part_size = 0
+    while not PART_FILES.empty():
+        file_path = PART_FILES.get()
+        if os.path.exists(file_path):
+            part_size += os.path.getsize(file_path)
+    
+    finished_size = 0
+    while not FINISHED_FILES.empty():
+        file_path = FINISHED_FILES.get()
+        finished_size += os.path.getsize(file_path)
+
+    existent_size = 0
+    while not EXISTENT_FILES.empty():
+        file_path = EXISTENT_FILES.get()
+        existent_size += os.path.getsize(file_path)
+
+    downloaded_size = finished_size + part_size
+
+    print()
+    print("Download statisctics:")
+    print(f"Files created: {finished_files}/{ALL_FILES} ({(finished_files/ALL_FILES * 100):.2f}%), already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}")
+    print(f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED/ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}")
+    print(f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size/ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes")
+    if not finished:
+        print("RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Download whole shared space, directory or a single file from Onedata Oneprovider."
@@ -389,15 +452,19 @@ def main():
         print("starting creating folder structure")
         result = process_node(onezone, args.file_id, directory)
         if result:
+            print_download_statistics(args.directory, finished=False)
             return result
+
         print("folder structure created")
         
         for thread_number in range(THREADS_NUMBER):
             result = threading.Thread(target=thread_worker, args=(thread_number, ), daemon=True).start() or result
         file_queue.join()
+        print_download_statistics(args.directory)
         return result
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
+        print_download_statistics(args.directory, finished=False)
         return 2
 
 
