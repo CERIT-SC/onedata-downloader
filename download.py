@@ -10,6 +10,8 @@ import os
 import sys
 import random
 import re
+import threading
+import queue
 
 try:
     import requests
@@ -45,6 +47,13 @@ CHUNK_SIZE = 33_554_432
 File extension of not yet completely downloaded (part) file.
 """
 PART_FILE_EXTENSION = ".oddown_part"
+
+"""
+Threads number for parallel downloading.
+"""
+THREADS_NUMBER = 1
+
+file_queue = queue.Queue()
 
 
 def convert_chunk_size(chunk_size: str) -> int:
@@ -113,16 +122,17 @@ def verbose_print(level, *args, **kwargs):
         print(*args, **kwargs)
 
 
-def download_file(onezone, file_id, file_name, directory):
+def download_file(onezone, file_id, file_name, directory, thread_number):
     """
     Download file with given file_id to given directory.
     """
     verbose_print(2, "download_file(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
     # don't download the file when it exists
     random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
-    print("Downloading file", directory + os.sep + file_name, end="")
+    verbose_print(1, f"Thread {thread_number}:", end=" ")
+    print("Downloading file", directory + os.sep + file_name, end=" ")
     verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
-    print("... ", end="", flush=True)
+    print("started", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
@@ -133,11 +143,13 @@ def download_file(onezone, file_id, file_name, directory):
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
                     os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
-                    verbose_print(2, "(renamed) ", end="")
-                    print("ok")
+                    verbose_print(2, f"Thread {thread_number}", random_filename, "renamed to", directory + os.sep + file_name)
+                    verbose_print(1, f"Thread {thread_number}:", end=" ")
+                    print(f"Downloading of", directory + os.sep + file_name, "ok")
                     return 0
                 except EnvironmentError as e:
-                    print("failed, exception occured:", e.__class__.__name__)
+                    verbose_print(1, f"Thread {thread_number}:", end=" ")
+                    print(f"Failed, exception occured:", e.__class__.__name__)
                     verbose_print(1, str(e))
                     return 2
             else:
@@ -149,21 +161,25 @@ def download_file(onezone, file_id, file_name, directory):
                     and "errno" in response_json["error"]["details"]
                     and "eacces" in response_json["error"]["details"]["errno"]
                 ):
-                    print(", response error: permission denied")
+                    verbose_print(1, f"Thread {thread_number}:", end=" ")
+                    print("Downloading of", directory + os.sep + file_name, "failed, response error: permission denied")
                 elif (
                     "error" in response_json
                     and "details" in response_json["error"]
                     and "errno" in response_json["error"]["details"]
                     and "enoent" in response_json["error"]["details"]["errno"]
                 ):
-                    print(", response error: no such file or directory")
+                    verbose_print(1, f"Thread {thread_number}:", end=" ")
+                    print("Downloading of", directory + os.sep + file_name, "failed, response error: no such file or directory")
                 else:
-                    print(", returned HTTP response code =", response.status_code)
+                    verbose_print(1, f"Thread {thread_number}:", end=" ")
+                    print("Downloading of", directory + os.sep + file_name, "failed, returned HTTP response code =", response.status_code)
 
-                verbose_print(1, response.json())
+                verbose_print(1, f"Thread {thread_number}:", response.json())
                 return 2
     else:
-        print("file exists, skipped")
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print("File", directory + os.sep + file_name, "exists, skipped")
         return 0
 
 
@@ -226,7 +242,8 @@ def process_node(onezone, file_id, directory):
         result = 0
         # check if node is directory or folder
         if node_type == "REG" or node_type == "SYMLNK":
-            result = download_file(onezone, file_id, node_name, directory) or result
+            verbose_print(1, "Adding file to queue", directory + os.sep + node_name)
+            file_queue.put((onezone, file_id, node_name, directory))
         elif node_type == "DIR":
             result = process_directory(onezone, file_id, node_name, directory) or result
         else:
@@ -295,6 +312,15 @@ def clean_directory(directory):
     return directory
 
 
+def thread_worker(thread_number: int):
+    result = 0
+    while True:
+        onezone, file_id, node_name, directory = file_queue.get()
+        result = download_file(onezone, file_id, node_name, directory, thread_number) or result
+        file_queue.task_done()
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Download whole shared space, directory or a single file from Onedata Oneprovider."
@@ -321,6 +347,13 @@ def main():
         help="The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit (e.g. 16k, 32M, 2G)",
     )
     parser.add_argument(
+        "-j",
+        "--threads-number",
+        default=1,
+        type=int,
+        help="Number of threads for parallel downloading. Not recommended to put very high number (>30), because downloading will slow down significantly.",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -342,12 +375,24 @@ def main():
     status = remove_part_files(args.directory)
     if not status:
         return 4
+    
+    global THREADS_NUMBER
+    THREADS_NUMBER = args.threads_number
+    if THREADS_NUMBER < 1:
+        print("failed on startup; number of threads cannot be lower than one")
+        return 5
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
 
     try:
         result = process_node(onezone, args.file_id, directory)
+        if result:
+            return result
+        
+        for thread_number in range(THREADS_NUMBER):
+            result = threading.Thread(target=thread_worker, args=(thread_number, ), daemon=True).start() or result
+        file_queue.join()
         return result
     except KeyboardInterrupt as e:
         print(" prematurely interrupted (" + e.__class__.__name__ + ")")
