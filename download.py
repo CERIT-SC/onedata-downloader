@@ -18,7 +18,7 @@ try:
 except:
     print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
     print("You can try install it by command:")
-    print("pip install requests")
+    print("pip3 install requests")
     print("or you can you can follow the steps described on:")
     print("https://onedata4sci.readthedocs.io/en/latest/user/onedata-downloader.html")
     sys.exit(1)
