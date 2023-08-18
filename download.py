@@ -142,9 +142,9 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
     # don't download the file when it exists
     random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
     verbose_print(1, f"Thread {thread_number}:", end=" ")
-    verbose_print(1,"Downloading file", directory + os.sep + file_name, end=" ")
+    verbose_print(1, "Downloading file", directory + os.sep + file_name, end=" ")
     verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
-    verbose_print(1,"started", flush=True)
+    verbose_print(1, "started", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
@@ -157,7 +157,13 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                             file.write(chunk)
                     os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
                     FINISHED_FILES.put(os.path.join(directory, file_name))
-                    verbose_print(2, f"Thread {thread_number}", random_filename, "renamed to", directory + os.sep + file_name)
+                    verbose_print(
+                        2,
+                        f"Thread {thread_number}",
+                        random_filename,
+                        "renamed to",
+                        directory + os.sep + file_name,
+                    )
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
                     print(f"Downloading file", directory + os.sep + file_name, "was successful")
                     return 0
@@ -176,7 +182,11 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                     and "eacces" in response_json["error"]["details"]["errno"]
                 ):
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print("Downloading of", directory + os.sep + file_name, "failed, response error: permission denied")
+                    print(
+                        "Downloading of",
+                        directory + os.sep + file_name,
+                        "failed, response error: permission denied",
+                    )
                 elif (
                     "error" in response_json
                     and "details" in response_json["error"]
@@ -184,10 +194,19 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                     and "enoent" in response_json["error"]["details"]["errno"]
                 ):
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print("Downloading of", directory + os.sep + file_name, "failed, response error: no such file or directory")
+                    print(
+                        "Downloading of",
+                        directory + os.sep + file_name,
+                        "failed, response error: no such file or directory",
+                    )
                 else:
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print("Downloading of", directory + os.sep + file_name, "failed, returned HTTP response code =", response.status_code)
+                    print(
+                        "Downloading of",
+                        directory + os.sep + file_name,
+                        "failed, returned HTTP response code =",
+                        response.status_code,
+                    )
 
                 verbose_print(1, f"Thread {thread_number}:", response.json())
                 return 2
@@ -365,7 +384,7 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
         file_path = PART_FILES.get()
         if os.path.exists(file_path):
             part_size += os.path.getsize(file_path)
-    
+
     finished_size = 0
     while not FINISHED_FILES.empty():
         file_path = FINISHED_FILES.get()
@@ -380,9 +399,15 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
 
     print()
     print("Download statistics:")
-    print(f"Files created: {finished_files}/{ALL_FILES} ({(finished_files/ALL_FILES * 100):.2f}%), already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}")
-    print(f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED/ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}")
-    print(f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size/ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes")
+    print(
+        f"Files created: {finished_files}/{ALL_FILES} ({(finished_files/ALL_FILES * 100):.2f}%), already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}"
+    )
+    print(
+        f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED/ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
+    )
+    print(
+        f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size/ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
+    )
     if not finished:
         print("RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY")
 
@@ -441,7 +466,7 @@ def main():
     status = remove_part_files(args.directory)
     if not status:
         return 4
-    
+
     global THREADS_NUMBER
     THREADS_NUMBER = args.threads_number
     if THREADS_NUMBER < 1:
@@ -457,10 +482,13 @@ def main():
         if result:
             print_download_statistics(args.directory, finished=False)
             return result
-        
+
         print("Downloading files")
         for thread_number in range(THREADS_NUMBER):
-            result = threading.Thread(target=thread_worker, args=(thread_number, ), daemon=True).start() or result
+            result = (
+                threading.Thread(target=thread_worker, args=(thread_number,), daemon=True).start()
+                or result
+            )
         file_queue.join()
         print_download_statistics(args.directory)
         return result
