@@ -142,9 +142,9 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
     # don't download the file when it exists
     random_filename = generate_random_string(size=16) + PART_FILE_EXTENSION
     verbose_print(1, f"Thread {thread_number}:", end=" ")
-    print("Downloading file", directory + os.sep + file_name, end=" ")
+    verbose_print(1,"Downloading file", directory + os.sep + file_name, end=" ")
     verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
-    print("started", flush=True)
+    verbose_print(1,"started", flush=True)
     if not os.path.exists(directory + os.sep + file_name):
         # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
         url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
@@ -159,7 +159,7 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                     FINISHED_FILES.put(os.path.join(directory, file_name))
                     verbose_print(2, f"Thread {thread_number}", random_filename, "renamed to", directory + os.sep + file_name)
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(f"Downloading of", directory + os.sep + file_name, "ok")
+                    print(f"Downloading file", directory + os.sep + file_name, "was successful")
                     return 0
                 except EnvironmentError as e:
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
@@ -211,9 +211,11 @@ def process_directory(onezone, file_id, file_name, directory):
     try:
         os.mkdir(directory + os.sep + file_name, mode=0o777)
         DIRECTORIES_CREATED += 1
-        print("directory created")
+        verbose_print(1, "directory created", end="")
+        print()
     except FileExistsError:
-        print("directory exists, not created")
+        print("directory exists, not created", end="")
+        print()
     except FileNotFoundError as e:
         DIRECTORIES_NOT_CREATED_OS_ERROR += 1
         print("failed, exception occured:", e.__class__.__name__)
@@ -271,7 +273,7 @@ def process_node(onezone, file_id, directory):
             ALL_FILES += 1
             if os.path.exists(os.path.join(directory, node_name)):
                 EXISTENT_FILES.put(os.path.join(directory, node_name))
-                print("File", directory + os.sep + node_name, "exists, skipped")
+                print("File", directory + os.sep + node_name, "exists, will not be downloaded")
                 return 0
 
             verbose_print(1, "Adding file to queue", directory + os.sep + node_name)
@@ -320,8 +322,8 @@ def clean_onezone(onezone):
 
     try:
         response_json = response.json()
-        verbose_print(1, "Onezone configuration:")
-        verbose_print(1, response_json)
+        verbose_print(2, "Onezone configuration:")
+        verbose_print(2, response_json)
     except Exception as e:
         print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
         sys.exit(2)
@@ -377,7 +379,7 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
     downloaded_size = finished_size + part_size
 
     print()
-    print("Download statisctics:")
+    print("Download statistics:")
     print(f"Files created: {finished_files}/{ALL_FILES} ({(finished_files/ALL_FILES * 100):.2f}%), already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}")
     print(f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED/ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}")
     print(f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size/ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes")
@@ -415,7 +417,7 @@ def main():
         "--threads-number",
         default=1,
         type=int,
-        help="Number of threads for parallel downloading. Not recommended to put very high number (>30), because downloading will slow down significantly.",
+        help="Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall download time.",
     )
     parser.add_argument(
         "-v",
@@ -450,14 +452,13 @@ def main():
     directory = clean_directory(args.directory)
 
     try:
-        print("starting creating folder structure")
+        print("Exploring and creating the directory structure")
         result = process_node(onezone, args.file_id, directory)
         if result:
             print_download_statistics(args.directory, finished=False)
             return result
-
-        print("folder structure created")
         
+        print("Downloading files")
         for thread_number in range(THREADS_NUMBER):
             result = threading.Thread(target=thread_worker, args=(thread_number, ), daemon=True).start() or result
         file_queue.join()
