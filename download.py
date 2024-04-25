@@ -2,7 +2,6 @@
 
 """
 Python script by which you can download Onedata space or directory with all its content. Downloaded directories and files have to be shared in Onedata.
-
 """
 
 import argparse
@@ -82,7 +81,10 @@ def convert_chunk_size(chunk_size: str) -> int:
     try:
         chunk_size = int(chunk_size)
     except ValueError as e:
-        print("failed while converting size to integer, exception occured:", e.__class__.__name__)
+        print(
+            "failed while converting size to integer, exception occured:",
+            e.__class__.__name__,
+        )
         return -1
 
     units = ("b", "k", "M", "G")
@@ -118,7 +120,11 @@ def remove_part_files(directory_to_search: str) -> bool:
             for actual_file in files:
                 if re.match(pattern, actual_file):
                     os.remove(os.path.join(root, actual_file))
-                    print("Partially downloaded file", root + os.sep + actual_file, "removed")
+                    print(
+                        "Partially downloaded file",
+                        root + os.sep + actual_file,
+                        "removed",
+                    )
     except Exception as e:
         print("failed while removing part files, exception occured:", e.__class__.__name__)
         return False
@@ -155,7 +161,10 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                     with open(directory + os.sep + random_filename, "wb") as file:
                         for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
                             file.write(chunk)
-                    os.rename(directory + os.sep + random_filename, directory + os.sep + file_name)
+                    os.rename(
+                        directory + os.sep + random_filename,
+                        directory + os.sep + file_name,
+                    )
                     FINISHED_FILES.put(os.path.join(directory, file_name))
                     verbose_print(
                         2,
@@ -165,7 +174,11 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
                         directory + os.sep + file_name,
                     )
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(f"Downloading file", directory + os.sep + file_name, "was successful")
+                    print(
+                        f"Downloading file",
+                        directory + os.sep + file_name,
+                        "was successful",
+                    )
                     return 0
                 except EnvironmentError as e:
                     verbose_print(1, f"Thread {thread_number}:", end=" ")
@@ -221,7 +234,10 @@ def process_directory(onezone, file_id, file_name, directory):
     """
     Process directory and recursively its content.
     """
-    verbose_print(2, "process_directory(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory))
+    verbose_print(
+        2,
+        "process_directory(%s, %s, %s, %s)" % (onezone, file_id, file_name, directory),
+    )
     global ALL_DIRECTORIES
     global DIRECTORIES_CREATED
     global DIRECTORIES_NOT_CREATED_OS_ERROR
@@ -292,7 +308,11 @@ def process_node(onezone, file_id, directory):
             ALL_FILES += 1
             if os.path.exists(os.path.join(directory, node_name)):
                 EXISTENT_FILES.put(os.path.join(directory, node_name))
-                print("File", directory + os.sep + node_name, "exists, will not be downloaded")
+                print(
+                    "File",
+                    directory + os.sep + node_name,
+                    "exists, will not be downloaded",
+                )
                 return 0
 
             verbose_print(1, "Adding file to queue", directory + os.sep + node_name)
@@ -344,7 +364,10 @@ def clean_onezone(onezone):
         verbose_print(2, "Onezone configuration:")
         verbose_print(2, response_json)
     except Exception as e:
-        print("Error: failure while parsing JSON response from Onezone:", e.__class__.__name__)
+        print(
+            "Error: failure while parsing JSON response from Onezone:",
+            e.__class__.__name__,
+        )
         sys.exit(2)
 
     # get Onezone version
@@ -422,7 +445,7 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
     else:
         print(
             f"Downloaded size: 0 bytes, finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
-        ) 
+        )
     if not finished:
         print("RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY")
 
