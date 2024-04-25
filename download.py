@@ -452,7 +452,7 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download whole shared space, directory or a single file from Onedata Oneprovider."
+        description="Script allowing you to download a complete shared space, directory or even a single file from the Onedata system."
     )
     parser.add_argument(
         "-o",
@@ -473,14 +473,14 @@ def main():
         "--chunk-size",
         default="32M",
         type=str,
-        help="The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit (e.g. 16k, 32M, 2G)",
+        help="The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit e.g. 16k, 32M or 2G (default: 32M).",
     )
     parser.add_argument(
         "-j",
         "--threads-number",
         default=1,
         type=int,
-        help="Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall download time.",
+        help="Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall download time (default: 1).",
     )
     parser.add_argument(
         "-v",
