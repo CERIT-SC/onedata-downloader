@@ -526,20 +526,6 @@ def main():
         help="Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall download time (default: 1).",
     )
     parser.add_argument(
-        "-t",
-        "--tries-number",
-        default=1,
-        type=int,
-        help="Number of tries to download specific file. Increasing this number more traffic can be processed (default: 1).",
-    )
-    parser.add_argument(
-        "-s",
-        "--sleep",
-        default=1,
-        type=int,
-        help="Number of seconds to sleep between tries to download the file (default: 1).",
-    )
-    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -567,18 +553,6 @@ def main():
     if THREADS_NUMBER < 1:
         print("failed on startup; number of threads cannot be lower than one")
         return 5
-
-    global TRIES_NUMBER
-    TRIES_NUMBER = args.tries_number
-    if TRIES_NUMBER < 1:
-        print("failed on startup; number of tries for specific file cannot be lower than one")
-        return 6
-
-    global TRIES_DELAY
-    TRIES_DELAY = args.sleep
-    if TRIES_DELAY < 0:
-        print("failed on startup; delay between two tries cannot be lower lower than zero seconds")
-        return 7
 
     onezone = clean_onezone(args.onezone)
     directory = clean_directory(args.directory)
