@@ -46,6 +46,11 @@ options:
   -j THREADS_NUMBER, --threads-number THREADS_NUMBER
                         Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall
                         download time.
+  -t TRIES_NUMBER, --tries-number TRIES_NUMBER
+                        Number of tries for file downloading. This will be applied in the situation when error occurres.
+                        Increasing this number more traffic can be processed.
+  -s TRIES_DELAY, --sleep TRIES_DELAY
+                        Number of seconds to sleep between unsuccessful tries to download the file.
   -v, --verbose         Set verbose prints - displaying debug information
 ```
 
