@@ -61,7 +61,7 @@ TRIES_NUMBER = 3
 """
 Number of seconds between two tries to download the file
 """
-TRIES_DELAY = 1
+TRIES_DELAY = 5
 
 ROOT_DIRECTORY_SIZE = 0
 
