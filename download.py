@@ -56,7 +56,7 @@ THREADS_NUMBER = 1
 """
 Tries of downloading the file after error occurred
 """
-TRIES_NUMBER = 1
+TRIES_NUMBER = 3
 
 """
 Number of seconds between two tries to download the file
