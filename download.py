@@ -11,6 +11,7 @@ import random
 import re
 import threading
 import queue
+import time
 
 try:
     import requests
@@ -52,6 +53,16 @@ Threads number for parallel downloading.
 """
 THREADS_NUMBER = 1
 
+"""
+Tries of downloading the file after error occurred
+"""
+TRIES_NUMBER = 3
+
+"""
+Number of seconds between two tries to download the file
+"""
+TRIES_DELAY = 5
+
 ROOT_DIRECTORY_SIZE = 0
 
 ALL_DIRECTORIES = 0
@@ -65,6 +76,7 @@ PART_FILES = queue.Queue()
 
 
 file_queue = queue.Queue()
+ERROR_QUEUE = queue.Queue()
 
 
 def convert_chunk_size(chunk_size: str) -> int:
@@ -140,6 +152,76 @@ def verbose_print(level, *args, **kwargs):
         print(*args, **kwargs)
 
 
+def error_printer(response: requests.Response, thread_number: int, directory: str, file_name: str):
+    print("failed", end="")
+    response_json = response.json()
+    if (
+            "error" in response_json
+            and "details" in response_json["error"]
+            and "errno" in response_json["error"]["details"]
+            and "eacces" in response_json["error"]["details"]["errno"]
+    ):
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print(
+            "Downloading of",
+            directory + os.sep + file_name,
+            "failed, response error: permission denied",
+        )
+    elif (
+            "error" in response_json
+            and "details" in response_json["error"]
+            and "errno" in response_json["error"]["details"]
+            and "enoent" in response_json["error"]["details"]["errno"]
+    ):
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print(
+            "Downloading of",
+            directory + os.sep + file_name,
+            "failed, response error: no such file or directory",
+        )
+    else:
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print(
+            "Downloading of",
+            directory + os.sep + file_name,
+            "failed, returned HTTP response code =",
+            response.status_code,
+        )
+
+    verbose_print(1, f"Thread {thread_number}:", response.json())
+
+
+def chunkwise_downloader(request: requests.Response, directory: str, file_name: str, random_filename: str, thread_number: int) -> int:
+    try:
+        with open(directory + os.sep + random_filename, "wb") as file:
+            for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
+                file.write(chunk)
+        os.rename(
+            directory + os.sep + random_filename,
+            directory + os.sep + file_name,
+        )
+        FINISHED_FILES.put(os.path.join(directory, file_name))
+        verbose_print(
+            2,
+            f"Thread {thread_number}",
+            random_filename,
+            "renamed to",
+            directory + os.sep + file_name,
+        )
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print(
+            f"Downloading file",
+            directory + os.sep + file_name,
+            "was successful",
+        )
+        return 0
+    except EnvironmentError as e:
+        verbose_print(1, f"Thread {thread_number}:", end=" ")
+        print(f"Failed {directory + os.sep + file_name}, exception occured:", e.__class__.__name__)
+        verbose_print(1, str(e))
+        return 1
+
+
 def download_file(onezone, file_id, file_name, directory, thread_number):
     """
     Download file with given file_id to given directory.
@@ -151,83 +233,36 @@ def download_file(onezone, file_id, file_name, directory, thread_number):
     verbose_print(1, "Downloading file", directory + os.sep + file_name, end=" ")
     verbose_print(2, " (temporary filename " + random_filename + ") ", end="")
     verbose_print(1, "started", flush=True)
-    if not os.path.exists(directory + os.sep + file_name):
-        # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
-        url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
-        with requests.get(url, allow_redirects=True, stream=True) as request:
-            if request.ok:
-                try:
-                    PART_FILES.put(os.path.join(directory, random_filename))
-                    with open(directory + os.sep + random_filename, "wb") as file:
-                        for chunk in request.iter_content(chunk_size=CHUNK_SIZE):
-                            file.write(chunk)
-                    os.rename(
-                        directory + os.sep + random_filename,
-                        directory + os.sep + file_name,
-                    )
-                    FINISHED_FILES.put(os.path.join(directory, file_name))
-                    verbose_print(
-                        2,
-                        f"Thread {thread_number}",
-                        random_filename,
-                        "renamed to",
-                        directory + os.sep + file_name,
-                    )
-                    verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(
-                        f"Downloading file",
-                        directory + os.sep + file_name,
-                        "was successful",
-                    )
-                    return 0
-                except EnvironmentError as e:
-                    verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(f"Failed, exception occured:", e.__class__.__name__)
-                    verbose_print(1, str(e))
-                    return 2
-            else:
-                print("failed", end="")
-                response_json = response.json()
-                if (
-                    "error" in response_json
-                    and "details" in response_json["error"]
-                    and "errno" in response_json["error"]["details"]
-                    and "eacces" in response_json["error"]["details"]["errno"]
-                ):
-                    verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(
-                        "Downloading of",
-                        directory + os.sep + file_name,
-                        "failed, response error: permission denied",
-                    )
-                elif (
-                    "error" in response_json
-                    and "details" in response_json["error"]
-                    and "errno" in response_json["error"]["details"]
-                    and "enoent" in response_json["error"]["details"]["errno"]
-                ):
-                    verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(
-                        "Downloading of",
-                        directory + os.sep + file_name,
-                        "failed, response error: no such file or directory",
-                    )
-                else:
-                    verbose_print(1, f"Thread {thread_number}:", end=" ")
-                    print(
-                        "Downloading of",
-                        directory + os.sep + file_name,
-                        "failed, returned HTTP response code =",
-                        response.status_code,
-                    )
 
-                verbose_print(1, f"Thread {thread_number}:", response.json())
-                return 2
-    else:
+    if os.path.exists(directory + os.sep + file_name):
         EXISTENT_FILES.put(os.path.join(directory, file_name))
         verbose_print(1, f"Thread {thread_number}:", end=" ")
         print("File", directory + os.sep + file_name, "exists, skipped")
         return 0
+
+    # https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/download_file_content
+    url = onezone + ONEZONE_API + "shares/data/" + file_id + "/content"
+
+    try_number = 0
+    for try_number in range(TRIES_NUMBER):
+        with requests.get(url, allow_redirects=True, stream=True) as request:
+            if not request.ok:
+                error_printer(request, thread_number, directory, file_name)
+                return 2
+
+            if try_number == 0:
+                PART_FILES.put(os.path.join(directory, random_filename))
+
+            if chunkwise_downloader(request, directory, file_name, random_filename, thread_number) == 0:
+                break
+
+            time.sleep(TRIES_DELAY)
+
+    if try_number == TRIES_NUMBER - 1:
+        ERROR_QUEUE.put(f"The file {directory + os.sep + file_name} could not be downloaded")
+        return 2
+
+    return 0
 
 
 def process_directory(onezone, file_id, file_name, directory):
@@ -399,6 +434,8 @@ def thread_worker(thread_number: int):
 
 
 def print_download_statistics(directory_to_search: str, finished: bool = True):
+    errors = ERROR_QUEUE.qsize()
+
     existent_files = EXISTENT_FILES.qsize()
     finished_files = FINISHED_FILES.qsize()
 
@@ -421,6 +458,12 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
     downloaded_size = finished_size + part_size
 
     print()
+    if errors != 0:
+        print("Errors during execution:")
+        while not ERROR_QUEUE.empty():
+            print(ERROR_QUEUE.get())
+        print()
+
     print("Download statistics:")
     if ALL_FILES != 0:
         print(
@@ -528,6 +571,7 @@ def main():
                 or result
             )
         file_queue.join()
+        result = 0 if ERROR_QUEUE.qsize() == 0 else 1
         print_download_statistics(args.directory)
         return result
     except KeyboardInterrupt as e:
