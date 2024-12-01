@@ -122,7 +122,9 @@ class DownloadableItem(object):
         self._part_filename: str = generate_random_string(size=16) + PART_FILE_EXTENSION
         self._priority_subtractor: Generator = priority_subtractor()
         self._path = os.path.join(self._directory, self._node_name)  # not to compute it again
-        self._part_path = os.path.join(self._directory, self._part_filename)  # not to compute it again
+        self._part_path = os.path.join(
+            self._directory, self._part_filename
+        )  # not to compute it again
         self._urls = URLs(self._onezone, self._file_id)
 
     @property
@@ -147,8 +149,7 @@ class DownloadableItem(object):
 
     @property
     def priority(self) -> int:
-        """Number representing priority, lower number is higher priority
-        """
+        """Number representing priority, lower number is higher priority"""
         return MAX_PRIORITY - self._priority
 
     @property
@@ -164,8 +165,7 @@ class DownloadableItem(object):
         return self._urls
 
     def _decrease_priority(self) -> None:
-        """Lowers the priority by one step
-        """
+        """Lowers the priority by one step"""
         self._priority = max(0, self._priority + next(self._priority_subtractor))
 
     def try_to_download(self) -> bool:
@@ -177,10 +177,11 @@ class DownloadableItem(object):
         return True
 
     def __lt__(self, other) -> bool:
-        """Sorting by priority, lower number is higher priority
-        """
+        """Sorting by priority, lower number is higher priority"""
         if not isinstance(other, DownloadableItem):
-            raise TypeError(f"Instance of {type(other).__name__} cannot be compared with {type(self).__name__}")
+            raise TypeError(
+                f"Instance of {type(other).__name__} cannot be compared with {type(self).__name__}"
+            )
         return self.priority < other.priority
 
 
@@ -216,8 +217,9 @@ class QueuePool:
             return
 
         passed_queue_items = 0
-        while (self._weight_queue.qsize() != sum(self._weights[self._queue_to_finish + 1:])
-               and passed_queue_items < sum(self._weights)):
+        while self._weight_queue.qsize() != sum(
+            self._weights[self._queue_to_finish + 1 :]
+        ) and passed_queue_items < sum(self._weights):
             # deadlock possibility if different thread has not yet put number back
             try:
                 act_ind = self._weight_queue.get(block=False)
@@ -229,7 +231,9 @@ class QueuePool:
             passed_queue_items += 1
 
         if self._queue_to_finish == index:
-            v_print(V.V, f"Thread {thread_number}: increasing queue index {self._queue_to_finish}++")
+            v_print(
+                V.V, f"Thread {thread_number}: increasing queue index {self._queue_to_finish}++"
+            )
             self._queue_to_finish += 1
 
     def _try_to_increase_weight(self, index: int, thread_number: int) -> int:
@@ -299,7 +303,10 @@ def convert_chunk_size(chunk_size: str) -> int:
     try:
         chunk_size = int(chunk_size)
     except ValueError as e:
-        v_print(V.DEF, f"failed while converting size to integer, exception occured: {e.__class__.__name__}")
+        v_print(
+            V.DEF,
+            f"failed while converting size to integer, exception occured: {e.__class__.__name__}",
+        )
         return -1
 
     units = ("b", "k", "M", "G")
@@ -336,7 +343,9 @@ def remove_part_files(directory_to_search: str) -> bool:
                 if re.match(pattern, actual_file):
                     file_path = os.path.join(root, actual_file)
                     try:
-                        os.remove(file_path)  # cannot get OSError, because not going through directories
+                        os.remove(
+                            file_path
+                        )  # cannot get OSError, because not going through directories
                     except FileNotFoundError:
                         v_print(V.DEF, f"cannot remove {file_path}, it does not exist")
                     else:
@@ -365,26 +374,36 @@ def error_printer(response: requests.Response, thread_number: int, file: Downloa
 
     v_print(V.V, f"Thread {thread_number}:", end=" ")
     if (
-            "error" in response_json  # dict
-            and "details" in response_json["error"]  # dict
-            and "errno" in response_json["error"]["details"]
-            and response_json["error"]["details"]["errno"] in ("eaccess", "enoent")
+        "error" in response_json  # dict
+        and "details" in response_json["error"]  # dict
+        and "errno" in response_json["error"]["details"]
+        and response_json["error"]["details"]["errno"] in ("eaccess", "enoent")
     ):
         if "eacces" in response_json["error"]["details"]["errno"]:
             v_print(V.DEF, f"Downloading of {file.path} failed, response error: permission denied")
         if "enoent" in response_json["error"]["details"]["errno"]:
-            v_print(V.DEF, f"Downloading of {file.path} failed, response error: no such file or directory")
+            v_print(
+                V.DEF,
+                f"Downloading of {file.path} failed, response error: no such file or directory",
+            )
     else:
-        v_print(V.DEF, f"Downloading of {file.path} failed, returned HTTP response code = {response.status_code}")
+        v_print(
+            V.DEF,
+            f"Downloading of {file.path} failed, returned HTTP response code = {response.status_code}",
+        )
 
     v_print(V.V, f"Thread {thread_number}:", response_json)
 
 
-def chunkwise_downloader(request: requests.Response, file: DownloadableItem, thread_number: int) -> int:
+def chunkwise_downloader(
+    request: requests.Response, file: DownloadableItem, thread_number: int
+) -> int:
     try:
-        with open(file.part_path, "ab") as f:  # if file was already opened and written into, it will continue
+        with open(
+            file.part_path, "ab"
+        ) as f:  # if file was already opened and written into, it will continue
             for chunk in request.iter_content(chunk_size=CHUNK_SIZE, decode_unicode=True):
-            # for chunk in request.iter_content():
+                # for chunk in request.iter_content():
                 f.write(chunk)
                 # flushing automatically as OS says
         # the file is closed now
@@ -405,7 +424,9 @@ def renamer(file: DownloadableItem, thread_number: int):
         v_print(V.VV, f"Thread {thread_number}: {file.part_filename} renamed to {file.path}")
         v_print(V.V, f"Thread {thread_number}:", end=" ")
     except OSError:
-        v_print(V.V, f"Thread {thread_number}: could not rename {file.part_filename} to {file.path}")
+        v_print(
+            V.V, f"Thread {thread_number}: could not rename {file.part_filename} to {file.path}"
+        )
         return 1
 
     return 0
@@ -415,7 +436,9 @@ def download_file(file: DownloadableItem, thread_number: int):
     """
     Download file with given file_id to given directory.
     """
-    v_print(V.VV, f"download_file({file.onezone}, {file.file_id}, {file.node_name}, {file.directory})")
+    v_print(
+        V.VV, f"download_file({file.onezone}, {file.file_id}, {file.node_name}, {file.directory})"
+    )
     # don't download the file when it exists
 
     v_print(V.V, f"Thread {thread_number}:", end=" ")
@@ -438,15 +461,20 @@ def download_file(file: DownloadableItem, thread_number: int):
         v_print(V.V, f"already downloaded {already_downloaded} bytes")
         headers["Range"] = f"bytes={already_downloaded}-"
 
-    with requests.get(file.URL.content, headers=headers, allow_redirects=True, stream=True) as request:
+    with requests.get(
+        file.URL.content, headers=headers, allow_redirects=True, stream=True
+    ) as request:
         if request.status_code == 416:
             v_print(V.VV, f"Thread {thread_number}:", end=" ")
             v_print(V.V, "got status code 416 while downloading, trying to get the original size")
             with requests.get(file.URL.content, allow_redirects=True, stream=True) as request_size:
                 original_size = request_size.headers.get("content-length")
                 if already_downloaded != original_size:
-                    v_print(V.V, f"the original size does not match, already downloaded: {already_downloaded}, "
-                                 f"file size: {original_size}")
+                    v_print(
+                        V.V,
+                        f"the original size does not match, already downloaded: {already_downloaded}, "
+                        f"file size: {original_size}",
+                    )
                     return 5
                 v_print(V.V, f"the original size does matches, the size is: {already_downloaded}")
         else:
@@ -469,7 +497,7 @@ def process_directory(onezone, file_id, file_name, directory):
     """
     Process directory and recursively its content.
     """
-    v_print(V.VV,f"process_directory({onezone}, {file_id}, {file_name}, {directory})")
+    v_print(V.VV, f"process_directory({onezone}, {file_id}, {file_name}, {directory})")
     global ALL_DIRECTORIES
     global DIRECTORIES_CREATED
     global DIRECTORIES_NOT_CREATED_OS_ERROR
@@ -554,8 +582,9 @@ def process_node(onezone: str, file_id: str, directory: str):
 
         return result
     else:
-        v_print(V.DEF,
-            "Error: failed to retrieve information about the node. The requested node may not exist."
+        v_print(
+            V.DEF,
+            "Error: failed to retrieve information about the node. The requested node may not exist.",
         )
         v_print(V.V, "requested node File ID =", file_id)
         v_print(V.V, response.json())
@@ -590,7 +619,8 @@ def clean_onezone(onezone):
         v_print(V.VV, "Onezone configuration:")
         v_print(V.VV, response_json)
     except Exception as e:
-        v_print(V.DEF,
+        v_print(
+            V.DEF,
             "Error: failure while parsing JSON response from Onezone:",
             e.__class__.__name__,
         )
@@ -620,7 +650,10 @@ def thread_worker(thread_number: int):
         queue_index = QP.fair_index(thread_number)
         actual_queue = QP.get_queue(queue_index)
         try:
-            v_print(V.V, f"Thread {thread_number}: acquiring download or blocked state in queue {queue_index}")
+            v_print(
+                V.V,
+                f"Thread {thread_number}: acquiring download or blocked state in queue {queue_index}",
+            )
             downloadable_item: DownloadableItem = actual_queue.get(block=True)
             v_print(V.V, f"Thread {thread_number}: acquired download in {queue_index}")
         except queue.Empty:  # incorrect queue
@@ -629,7 +662,10 @@ def thread_worker(thread_number: int):
         if queue_index == 0:
             PART_FILES.put(downloadable_item.part_path)
 
-        v_print(V.VV, f"Thread: {thread_number}, actual queue index: {queue_index}, file priority: {downloadable_item.priority}, ttl: {downloadable_item._ttl}")
+        v_print(
+            V.VV,
+            f"Thread: {thread_number}, actual queue index: {queue_index}, file priority: {downloadable_item.priority}, ttl: {downloadable_item._ttl}",
+        )
         if downloadable_item.try_to_download():
             result = download_file(downloadable_item, thread_number)
 
