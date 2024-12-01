@@ -474,7 +474,7 @@ def process_directory(onezone, file_id, file_name, directory):
     global DIRECTORIES_CREATED
     global DIRECTORIES_NOT_CREATED_OS_ERROR
     # don't create the the directory when it exists
-    v_print(V.DEF, "Processing directory", directory + os.sep + file_name, end="... ", flush=True)
+    v_print(V.DEF, "Processing directory", directory + os.sep + file_name, flush=True)
     try:
         os.mkdir(directory + os.sep + file_name, mode=0o777)
         DIRECTORIES_CREATED += 1
