@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Python script by which you can download Onedata space or directory with all its content. Downloaded directories and files have to be shared in Onedata.
+Python script to download the content of Onedata Share (https://onedata.org/#/home/documentation/20.02/doc/using_onedata/shares.html). 
+The script allows you to recursively download an entire directory structure or even a single file. 
 """
 
 import argparse
@@ -19,8 +20,8 @@ except:
     print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
     print("You can try install it by command:")
     print("pip3 install requests")
-    print("or you can you can follow the steps described on:")
-    print("https://onedata4sci.readthedocs.io/en/latest/user/onedata-downloader.html")
+    print("Or you can follow the instructions available here:")
+    print("https://github.com/CERIT-SC/onedata-downloader")
     sys.exit(1)
 
 
