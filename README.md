@@ -1,4 +1,5 @@
-Python script by which you can download content of Onedata Share. The script can download whole directory recursively or also a single file.
+Python script to download the content of Onedata Share (https://onedata.org/#/home/documentation/20.02/doc/using_onedata/shares.html). 
+The script allows you to recursively download an entire directory structure or even a single file. 
 
 Requirements:
 - Python 3
@@ -7,7 +8,7 @@ Requirements:
 Python 3 can be installed from URL
 https://www.python.org/downloads/
 
-Module requests can be installed by command
+Python module requests can be installed like this:
 
 ```
 pip3 install requests
@@ -22,12 +23,15 @@ python3 download.py FILE_ID
 or
 
 ```
+# In this case, the file must have the executable permission set.
 ./download.py FILE_ID
 ```
 
-`FILE_ID` is a string which can be obtained from a web page of the Onedata Share. The `File ID` is listed in `File Details` window accessible by
-- click on the icon of the desired node (directory or file), 
-- right click on the node and choosing menu item `Information`.
+`FILE_ID` is a string which can be obtained from a web page of the Onedata Share. The `File ID` is listed in `Info` tab accessible by:
+
+- click on the icon of a desired directory or a file, 
+- right click on the node and choosing menu item `Information`, 
+- you can find the `File ID` value in the `Info` tab. This value can be copied by clicking on the icon in the bottom right corner of the field.
 
 Arguments:
 ```
@@ -41,20 +45,26 @@ options:
   -d DIRECTORY, --directory DIRECTORY
                         Output directory (default: current directory)
   -c CHUNK_SIZE, --chunk-size CHUNK_SIZE
-                        The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with
-                        unit (e.g. 16k, 32M, 2G)
+                        The size of downloaded file segments (chunks) after which the file is written to disk. Value can be in bytes, or a number with unit
+                        e.g. 16k, 32M or 2G (default: 32M).
   -j THREADS_NUMBER, --threads-number THREADS_NUMBER
                         Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall
-                        download time.
+                        download time (default: 1).
   -v, --verbose         Set verbose prints - displaying debug information
 ```
 
 Examples:
 ```
-./download.py 00000000007E6C76736861726547756964233039383266613462303663623832666666623932633661366363396433636432636837353962233037646231353336326536646363363633393039396136613030383537643738636832366538233134613830313936336235363761656533376665396536633536666434636235636834653138
+# download the script
+wget https://raw.githubusercontent.com/CERIT-SC/onedata-downloader/master/download.py
+# or
+curl -O https://raw.githubusercontent.com/CERIT-SC/onedata-downloader/master/download.py
+
+# run the script
+python3 download.py 00000000007E6C76736861726547756964233039383266613462303663623832666666623932633661366363396433636432636837353962233037646231353336326536646363363633393039396136613030383537643738636832366538233134613830313936336235363761656533376665396536633536666434636235636834653138
 ```
 
-or with a Onezone specified
+or with a Onezone hostname specified
 
 ```
 ./download.py --onezone https://datahub.egi.eu  00000000007E6C76736861726547756964233039383266613462303663623832666666623932633661366363396433636432636837353962233037646231353336326536646363363633393039396136613030383537643738636832366538233134613830313936336235363761656533376665396536633536666434636235636834653138
