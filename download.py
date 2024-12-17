@@ -39,7 +39,7 @@ MAX_PRIORITY = 3
 
 """Tries of downloading the file after error occurred
 """
-TRIES_NUMBER: int = 7
+TRIES_NUMBER: int = 2
 
 """
 Default verbosity level.
