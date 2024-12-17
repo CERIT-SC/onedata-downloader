@@ -35,7 +35,7 @@ V = VERBOSITY
 
 """Max (lowest) priority for downloading the file 
 """
-MAX_PRIORITY = 3
+MAX_PRIORITY: int = 3
 
 """Tries of downloading the file after error occurred
 """
@@ -49,7 +49,7 @@ VERBOSITY = V.DEF
 """
 Default Onezone service URL.
 """
-DEFAULT_ONEZONE = "https://datahub.egi.eu"
+DEFAULT_ONEZONE: str = "https://datahub.egi.eu"
 
 """
 Used Onezone API URI.
@@ -779,7 +779,7 @@ def setup_parser() -> argparse.ArgumentParser:
         default=0,
         help="Set verbose prints - displaying debug information",
     )
-    parser.add_argument("file_id", type=str, help="File ID of shared space, directory or a file")
+    parser.add_argument("file_id", type=str, help="Public File ID of shared space, directory or a file")
 
     return parser
 
