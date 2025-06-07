@@ -742,7 +742,7 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Script allowing you to download a complete shared space, directory or even a single file from the Onedata system."
+        description="Script allowing you to download a complete shared space, directory or a single file from the Onedata system."
     )
     parser.add_argument(
         "-o",
