@@ -1,5 +1,5 @@
 Python script to download the content of Onedata Share (https://onedata.org/#/home/documentation/20.02/doc/using_onedata/shares.html). 
-The script allows you to recursively download an entire directory structure or even a single file. 
+The script allows you to recursively download an entire directory structure or a single file. 
 
 Requirements:
 - Python 3
@@ -36,7 +36,7 @@ or
 Arguments:
 ```
 positional arguments:
-  file_id               File ID of shared space, directory or a file
+  file_id               Public File ID of shared space, directory or a file
 
 options:
   -h, --help            show this help message and exit
@@ -50,7 +50,7 @@ options:
   -j THREADS_NUMBER, --threads-number THREADS_NUMBER
                         Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall
                         download time (default: 1).
-  -v, --verbose         Set verbose prints - displaying debug information
+  -v, --verbose         Set verbose (debug) prints. There are two levels of these prints.
 ```
 
 Examples:
