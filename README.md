@@ -50,7 +50,7 @@ options:
   -j THREADS_NUMBER, --threads-number THREADS_NUMBER
                         Number of threads for parallel downloading. Setting this parameter to a reasonable value can significantly reduce the overall
                         download time (default: 1).
-  -v, --verbose         Set verbose prints - displaying debug information
+  -v, --verbose         Set verbose (debug) prints. There are two levels of these prints.
 ```
 
 Examples:

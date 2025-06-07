@@ -777,7 +777,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="count",
         default=0,
-        help="Set verbose prints - displaying debug information",
+        help="Set verbose (debug) prints. There are two levels of these prints.",
     )
     parser.add_argument("file_id", type=str, help="Public File ID of shared space, directory or a file")
 
