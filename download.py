@@ -86,6 +86,11 @@ DIRECTORY: Path = Path(".")
 
 FILE_ID: Optional[str] = None
 
+"""
+Timeout for queue blocking operations.
+"""
+TIMEOUT = 1
+
 
 def priority_subtractor():
     iterator = 0
@@ -880,13 +885,19 @@ def thread_worker(thread_number: int) -> int:
     while True:
         queue_index = QP.fair_queue_index(thread_number)
         actual_queue = QP.get_queue(queue_index, thread_number)
+
+        v_print(
+            V.V,
+            f"Thread {thread_number}: Acquiring item to download in queue {queue_index}, timeout {TIMEOUT}",
+        )
         try:
-            v_print(
-                V.V,
-                f"Thread {thread_number}: Acquiring download or blocked state in queue {queue_index}",
+            downloadable_item: DownloadableItem = actual_queue.get(
+                block=True, timeout=TIMEOUT
             )
-            downloadable_item: DownloadableItem = actual_queue.get(block=True)
-            v_print(V.VV, f"Thread {thread_number}: Acquired download in {queue_index}")
+            v_print(
+                V.VV,
+                f"Thread {thread_number}: Acquired item download in {queue_index}",
+            )
         except queue.Empty:  # incorrect queue
             v_print(
                 V.VV,
