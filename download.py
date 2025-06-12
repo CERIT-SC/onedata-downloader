@@ -17,7 +17,8 @@ from typing import Optional, Generator
 
 try:
     import requests
-except:
+except ImportError:
+    requests = None
     print(
         "ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)"
     )
