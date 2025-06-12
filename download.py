@@ -427,7 +427,7 @@ def convert_chunk_size(chunk_size: str) -> int:
     chunk_size = chunk_size.strip()
     unit = "b"
     if chunk_size[-1].isalpha():
-        unit = chunk_size[-1]
+        unit = chunk_size[-1].lower()
         chunk_size = chunk_size[:-1]
 
     try:
@@ -435,11 +435,12 @@ def convert_chunk_size(chunk_size: str) -> int:
     except ValueError as e:
         v_print(
             V.DEF,
-            f"failed while converting size to integer, exception occured: {e.__class__.__name__}",
+            f"Failed while converting size to integer, exception occured: {e.__class__.__name__}",
         )
         return -1
 
-    units = ("b", "k", "M", "G")
+    units = ("b", "k", "m", "g")
+    # unit already lowercased
     if unit not in units:
         v_print(
             V.DEF,
