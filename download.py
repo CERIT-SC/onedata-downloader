@@ -12,6 +12,7 @@ import random
 import re
 import threading
 import queue
+from pathlib import Path
 from typing import Optional, Generator
 
 try:
@@ -80,7 +81,7 @@ TRIES_DELAY: int = 1
 
 ONEZONE: str = DEFAULT_ONEZONE
 
-DIRECTORY: str = "."
+DIRECTORY: Path = Path(".")
 
 FILE_ID: Optional[str] = None
 
@@ -120,20 +121,18 @@ class DownloadableItem(object):
     including the Onezone URL, file ID, node name, and the directory where the file will be saved.
     """
 
-    def __init__(self, onezone: str, file_id: str, node_name: str, directory: str):
+    def __init__(self, onezone: str, file_id: str, node_name: str, directory: Path):
         self._onezone: str = onezone
         self._file_id: str = file_id
         self._node_name: str = node_name
-        self._directory: str = directory
+        self._directory: Path = directory
         self._priority: int = MAX_PRIORITY  # internal value, lowering
         self._ttl: int = TRIES_NUMBER
         self._part_filename: str = generate_random_string(size=16) + PART_FILE_EXTENSION
         self._priority_subtractor: Generator = priority_subtractor()
-        self._path = os.path.join(
-            self._directory, self._node_name
-        )  # not to compute it again
-        self._part_path = os.path.join(
-            self._directory, self._part_filename
+        self._path: Path = self._directory / self._node_name  # not to compute it again
+        self._part_path: Path = (
+            self._directory / self._part_filename
         )  # not to compute it again
         self._urls = URLs(self._onezone, self._file_id)
 
@@ -153,12 +152,12 @@ class DownloadableItem(object):
         return self._node_name
 
     @property
-    def directory(self) -> str:
+    def directory(self) -> Path:
         """The directory where the file will be saved."""
         return self._directory
 
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         """The full path where the file will be saved, including the directory and node name."""
         return self._path
 
@@ -173,8 +172,7 @@ class DownloadableItem(object):
         return self._part_filename
 
     @property
-    def part_path(self) -> str:
-        """The full path of the part file, including the directory and part filename."""
+    def part_path(self) -> Path:
         return self._part_path
 
     @property
@@ -313,7 +311,7 @@ class QueuePool:
         index = self._weight_queue.get()
         return index
 
-    def fair_index(self, thread_number: int):
+    def fair_queue_index(self, thread_number: int) -> int:
         """Returns the index of the queue that should be accessed by the thread.
         This method ensures that the access to the queues is fair and based on their weights.
         If the queue at the returned index is empty,
@@ -425,39 +423,41 @@ def generate_random_string(size: int = 16) -> str:
     return random_string
 
 
-def remove_part_files(directory_to_search: str) -> bool:
+def remove_part_files(root_directory: Path) -> int:
     """Removes files in a tree with extension defined by global value PART_FILE_EXTENSION
     from the given directory and its subdirectories.
 
     Arguments:
-        directory_to_search (str): The directory to search for part files.
+        root_directory (str): The directory to search for part files.
 
     Returns:
         int: 0 if successful, 1 if an error occurred.
     """
     pattern = ".*\\" + PART_FILE_EXTENSION + "$"
     try:
-        for root, directories, files in os.walk(directory_to_search):
+        for root, directories, files in os.walk(root_directory):
             for actual_file in files:
-                if re.match(pattern, actual_file):
-                    file_path = os.path.join(root, actual_file)
-                    try:
-                        os.remove(
-                            file_path
-                        )  # cannot get OSError, because not going through directories
-                    except FileNotFoundError:
-                        v_print(V.DEF, f"cannot remove {file_path}, it does not exist")
-                    else:
-                        v_print(V.DEF, f"Partially downloaded file {file_path} removed")
+                if not re.match(pattern, actual_file):
+                    continue
+
+                file_path = Path(root) / actual_file
+                try:
+                    os.remove(
+                        file_path
+                    )  # cannot get OSError, because not going through directories
+                except FileNotFoundError:
+                    v_print(V.DEF, f"cannot remove {file_path}, it does not exist")
+                else:
+                    v_print(V.DEF, f"Partially downloaded file {file_path} removed")
     except OSError as e:
         v_print(
             V.DEF,
             "failed while removing part files, exception occured:",
             e.__class__.__name__,
         )
-        return False
+        return 1
 
-    return True
+    return 0
 
 
 def verbose_print(level: int, *args, **kwargs) -> None:
@@ -643,7 +643,7 @@ def download_file(file: DownloadableItem, thread_number: int):
     return 0
 
 
-def process_directory(onezone: str, file_id, file_name: str, directory: str):
+def process_directory(onezone: str, file_id, file_name: str, directory: Path):
     """
     Process directory and recursively its content.
     """
@@ -652,9 +652,9 @@ def process_directory(onezone: str, file_id, file_name: str, directory: str):
     global DIRECTORIES_CREATED
     global DIRECTORIES_NOT_CREATED_OS_ERROR
     # don't create the the directory when it exists
-    v_print(V.DEF, "Processing directory", directory + os.sep + file_name, flush=True)
+    v_print(V.DEF, "Processing directory", directory / file_name, flush=True)
     try:
-        os.mkdir(directory + os.sep + file_name, mode=0o777)
+        os.mkdir(directory / file_name, mode=0o777)
         DIRECTORIES_CREATED += 1
         v_print(V.V, "directory created")
     except FileExistsError:  # directory already existent
@@ -683,15 +683,12 @@ def process_directory(onezone: str, file_id, file_name: str, directory: str):
             child_file_id = child["file_id"]
         else:
             child_file_id = child["id"]
-        result = (
-            process_node(onezone, child_file_id, directory + os.sep + file_name)
-            or result
-        )
+        result = process_node(onezone, child_file_id, directory / file_name) or result
 
     return result
 
 
-def process_node(onezone: str, file_id: str, directory: str):
+def process_node(onezone: str, file_id: str, directory: Path):
     """
     Process given node (directory or file).
     """
@@ -820,7 +817,7 @@ def thread_worker(thread_number: int) -> int:
         int: Return code indicating success (0) or various error states.
     """
     while True:
-        queue_index = QP.fair_index(thread_number)
+        queue_index = QP.fair_queue_index(thread_number)
         actual_queue = QP.get_queue(queue_index)
         try:
             v_print(
@@ -854,7 +851,7 @@ def thread_worker(thread_number: int) -> int:
     return result
 
 
-def print_download_statistics(directory_to_search: str, finished: bool = True):
+def print_download_statistics(directory_to_search: Path, finished: bool = True):
     errors = ERROR_QUEUE.qsize()
 
     existent_files = EXISTENT_FILES.qsize()
