@@ -331,10 +331,13 @@ class QueuePool:
         self._mutex.acquire(blocking=True)
         v_print(V.VV, f"Thread {thread_number}: Mutex acquired")
 
-        if not (self._queue_to_finish >= index and self.get_queue(index).qsize() == 0):
-            v_print(V.VV, f"Thread {thread_number}: Condition not met, releasing")
+        if not (
+            self._queue_to_finish >= index
+            and self.get_queue(index, thread_number).qsize() == 0
+        ):
+            v_print(V.VV, f"Thread {thread_number}: Condition not met, releasing mutex")
             self._mutex.release()
-            index = self._weight_queue.get()
+            index = self._weight_queue.get()  # the index is put back to the queue later
             return index
 
         self._increase_weight(index, thread_number)
@@ -342,7 +345,7 @@ class QueuePool:
         v_print(V.VV, f"Thread {thread_number}: Releasing mutex")
         self._mutex.release()
 
-        index = self._weight_queue.get()
+        index = self._weight_queue.get()  # the index is put back to the queue later
         return index
 
     def fair_queue_index(self, thread_number: int) -> int:
@@ -365,7 +368,10 @@ class QueuePool:
             V.VV, f"Thread {thread_number}: Got index {index} from the weight queue"
         )
 
-        if self._queue_to_finish >= index and self.get_queue(index).qsize() == 0:
+        if (
+            self._queue_to_finish >= index
+            and self.get_queue(index, thread_number).qsize() == 0
+        ):
             v_print(
                 V.VV,
                 f"Thread {thread_number}: Queue {index} is empty, trying to increase weight",
@@ -379,11 +385,12 @@ class QueuePool:
         self._weight_queue.put(index)
         return index
 
-    def get_queue(self, index: int) -> queue.Queue:
+    def get_queue(self, index: int, thread_number: int = None) -> queue.Queue:
         """Returns the queue at the given index.
 
         Arguments:
             index (int): The index of the queue to return.
+            thread_number (int, optional): The number of the thread that is trying to access the queue.
 
         Returns:
             queue.Queue: The queue at the given index.
@@ -391,6 +398,7 @@ class QueuePool:
         Raises:
             IndexError: If the index is out of bounds.
         """
+        v_print(V.VV, f"Thread {thread_number}: Getting queue at index {index}")
         if index >= len(self._queues) or index < 0:
             raise IndexError("Queue index out of bounds")
         return self._queues[index]
@@ -871,7 +879,7 @@ def thread_worker(thread_number: int) -> int:
 
     while True:
         queue_index = QP.fair_queue_index(thread_number)
-        actual_queue = QP.get_queue(queue_index)
+        actual_queue = QP.get_queue(queue_index, thread_number)
         try:
             v_print(
                 V.V,
