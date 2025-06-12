@@ -257,28 +257,61 @@ class QueuePool:
             index (int): The index of the queue to increase the weight for.
             thread_number (int): The number of the thread that is trying to increase the weight.
         """
+        v_print(
+            V.VV, f"Thread {thread_number}: Trying to increase weight of queue {index}"
+        )
+
         # the last queue cannot be skipped
         if index == len(self) - 1:
+            v_print(V.VV, f"Thread {thread_number}: Last queue, not increasing weight")
             return
 
         passed_queue_items = 0
+        v_print(
+            V.VV,
+            f"Thread {thread_number}: Removing indices of index {index} from the weight queue",
+        )
+        v_print(
+            V.V,
+            f"Thread {thread_number}: Possible deadlock while removing indices of index {index} from the weight queue",
+        )
         while self._weight_queue.qsize() != sum(
             self._weights[self._queue_to_finish + 1 :]
         ) and passed_queue_items < sum(self._weights):
             # deadlock possibility if different thread has not yet put number back
             try:
+                v_print(
+                    V.VV, f"Thread {thread_number}: Getting index from the weight queue"
+                )
                 act_ind = self._weight_queue.get(block=False)
+                v_print(
+                    V.VV,
+                    f"Thread {thread_number}: Got index {act_ind} from the weight queue",
+                )
             except queue.Empty:
+                v_print(
+                    V.VV, f"Thread {thread_number}: Weight queue is empty, continuing"
+                )
                 passed_queue_items += 1
                 continue
             if act_ind != index:
+                v_print(
+                    V.VV,
+                    f"Thread {thread_number}: Putting index back to the weighted queue",
+                )
                 self._weight_queue.put(act_ind)
             passed_queue_items += 1
+
+        v_print(V.V, f"Thread {thread_number}: Possible deadlock not occurred")
+        v_print(
+            V.VV,
+            f"Thread {thread_number}: Indices of index {index} removed from the weight queue",
+        )
 
         if self._queue_to_finish == index:
             v_print(
                 V.V,
-                f"Thread {thread_number}: increasing queue index {self._queue_to_finish}++",
+                f"Thread {thread_number}: Increasing queue index {self._queue_to_finish}++",
             )
             self._queue_to_finish += 1
 
@@ -294,19 +327,19 @@ class QueuePool:
             int: The index of the queue that should be accessed by the thread after trying to increase the weight.
         """
 
-        v_print(V.VV, f"Thread {thread_number}: trying to acquire mutex")
+        v_print(V.VV, f"Thread {thread_number}: Trying to acquire mutex")
         self._mutex.acquire(blocking=True)
-        v_print(V.VV, f"Thread {thread_number}: mutex acquired")
+        v_print(V.VV, f"Thread {thread_number}: Mutex acquired")
 
         if not (self._queue_to_finish >= index and self.get_queue(index).qsize() == 0):
-            v_print(V.VV, f"Thread {thread_number}: condition not met, releasing")
+            v_print(V.VV, f"Thread {thread_number}: Condition not met, releasing")
             self._mutex.release()
             index = self._weight_queue.get()
             return index
 
         self._increase_weight(index, thread_number)
 
-        v_print(V.VV, f"Thread {thread_number}: releasing mutex")
+        v_print(V.VV, f"Thread {thread_number}: Releasing mutex")
         self._mutex.release()
 
         index = self._weight_queue.get()
@@ -324,12 +357,25 @@ class QueuePool:
         Returns:
             int: The index of the queue that should be accessed by the thread.
         """
+        v_print(
+            V.VV, f"Thread {thread_number}: Acquiring index of the queue to be used"
+        )
         index = self._weight_queue.get()
+        v_print(
+            V.VV, f"Thread {thread_number}: Got index {index} from the weight queue"
+        )
 
         if self._queue_to_finish >= index and self.get_queue(index).qsize() == 0:
+            v_print(
+                V.VV,
+                f"Thread {thread_number}: Queue {index} is empty, trying to increase weight",
+            )
             self._weight_queue.put(index)
             index = self._try_to_increase_weight(index, thread_number)
 
+        v_print(
+            V.VV, f"Thread {thread_number}: Returning index {index} to the weight queue"
+        )
         self._weight_queue.put(index)
         return index
 
@@ -528,6 +574,8 @@ def chunkwise_downloader(
     Returns:
         int: 0 if successful, 1 if an error occurred.
     """
+    v_print(V.VV, f"Thread {thread_number}:", end=" ")
+    v_print(V.V, f"Downloading file {file.path} in chunks", end=" ")
     try:
         with open(
             file.part_path, "ab"
@@ -563,13 +611,14 @@ def renamer(file: DownloadableItem, thread_number: int) -> int:
         FINISHED_FILES.put(file.path)
 
         v_print(
-            V.VV, f"Thread {thread_number}: {file.part_filename} renamed to {file.path}"
+            V.VV,
+            f"Thread {thread_number}: {file.part_filename} renamed to {file.path}",
         )
         v_print(V.V, f"Thread {thread_number}:", end=" ")
     except OSError:
         v_print(
             V.V,
-            f"Thread {thread_number}: could not rename {file.part_filename} to {file.path}",
+            f"Thread {thread_number}: Could not rename {file.part_filename} to {file.path}",
         )
         return 1
 
@@ -817,17 +866,23 @@ def thread_worker(thread_number: int) -> int:
     Returns:
         int: Return code indicating success (0) or various error states.
     """
+    result = 0
+
     while True:
         queue_index = QP.fair_queue_index(thread_number)
         actual_queue = QP.get_queue(queue_index)
         try:
             v_print(
                 V.V,
-                f"Thread {thread_number}: acquiring download or blocked state in queue {queue_index}",
+                f"Thread {thread_number}: Acquiring download or blocked state in queue {queue_index}",
             )
             downloadable_item: DownloadableItem = actual_queue.get(block=True)
-            v_print(V.V, f"Thread {thread_number}: acquired download in {queue_index}")
+            v_print(V.VV, f"Thread {thread_number}: Acquired download in {queue_index}")
         except queue.Empty:  # incorrect queue
+            v_print(
+                V.VV,
+                f"Thread {thread_number}: Queue {queue_index} is empty, continuing",
+            )
             continue
 
         if queue_index == 0:
@@ -835,8 +890,9 @@ def thread_worker(thread_number: int) -> int:
 
         v_print(
             V.VV,
-            f"Thread: {thread_number}, actual queue index: {queue_index}, file priority: {downloadable_item.priority}, ttl: {downloadable_item._ttl}",
+            f"Thread: {thread_number}, Actual queue index: {queue_index}, file priority: {downloadable_item.priority}, ttl: {downloadable_item._ttl}",
         )
+
         if downloadable_item.try_to_download():
             result = download_file(downloadable_item, thread_number)
 
