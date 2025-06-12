@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Python script to download the content of Onedata Share (https://onedata.org/#/home/documentation/20.02/doc/using_onedata/shares.html). 
-The script allows you to recursively download an entire directory structure or even a single file. 
+Python script to download the content of Onedata Share (https://onedata.org/#/home/documentation/20.02/doc/using_onedata/shares.html).
+The script allows you to recursively download an entire directory structure or even a single file.
 """
 
 import argparse
@@ -17,7 +17,9 @@ from typing import Optional, Generator
 try:
     import requests
 except:
-    print("ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)")
+    print(
+        "ModuleNotFoundError: No module named 'requests' (module 'requests' is not installed)"
+    )
     print("You can try install it by command:")
     print("pip3 install requests")
     print("Or you can follow the instructions available here:")
@@ -113,6 +115,11 @@ class URLs:
 
 
 class DownloadableItem(object):
+    """Represents an item that can be downloaded from Onezone.
+    This class encapsulates the necessary information for downloading a file,
+    including the Onezone URL, file ID, node name, and the directory where the file will be saved.
+    """
+
     def __init__(self, onezone: str, file_id: str, node_name: str, directory: str):
         self._onezone: str = onezone
         self._file_id: str = file_id
@@ -122,7 +129,9 @@ class DownloadableItem(object):
         self._ttl: int = TRIES_NUMBER
         self._part_filename: str = generate_random_string(size=16) + PART_FILE_EXTENSION
         self._priority_subtractor: Generator = priority_subtractor()
-        self._path = os.path.join(self._directory, self._node_name)  # not to compute it again
+        self._path = os.path.join(
+            self._directory, self._node_name
+        )  # not to compute it again
         self._part_path = os.path.join(
             self._directory, self._part_filename
         )  # not to compute it again
@@ -130,22 +139,27 @@ class DownloadableItem(object):
 
     @property
     def onezone(self) -> str:
+        """The Onezone URL where the file is hosted."""
         return self._onezone
 
     @property
     def file_id(self) -> str:
+        """The unique identifier of the file (file id) in Onezone."""
         return self._file_id
 
     @property
     def node_name(self) -> str:
+        """The name of the node (file or directory) in Onezone."""
         return self._node_name
 
     @property
     def directory(self) -> str:
+        """The directory where the file will be saved."""
         return self._directory
 
     @property
     def path(self) -> str:
+        """The full path where the file will be saved, including the directory and node name."""
         return self._path
 
     @property
@@ -155,14 +169,17 @@ class DownloadableItem(object):
 
     @property
     def part_filename(self) -> str:
+        """The name of the part file that is used during the download process."""
         return self._part_filename
 
     @property
     def part_path(self) -> str:
+        """The full path of the part file, including the directory and part filename."""
         return self._part_path
 
     @property
     def URL(self) -> URLs:
+        """URLs object containing the URLs for downloading the file content and its attributes."""
         return self._urls
 
     def _decrease_priority(self) -> None:
@@ -187,33 +204,61 @@ class DownloadableItem(object):
 
 
 class QueuePool:
+    """A pool of queues with weighted fair access to them.
+    This class allows multiple threads to access queues in a fair manner based on their weights.
+    Each queue has a weight, and the access to the queues is distributed according to these weights.
+    The queues are accessed in a round-robin manner,
+    with the weights determining how many times each queue is accessed before moving to the next one.
+
+    Round-robin by example:
+        - If there are two queues with weights 2 and 1, the access order will be: 0, 0, 1, 0, 0, 1, ...
+        - If there are three queues with weights 1, 2, and 3, the access order will be: 0, 1, 1, 2, 1, 1, 2, 0, ...
+    """
+
     def __init__(self, queues: tuple[queue.Queue, ...], weights: tuple[int, ...]):
         if len(queues) != len(weights):
-            raise AttributeError("Number of queues must be equal to number of their weights")
+            raise AttributeError(
+                "Number of queues must be equal to number of their weights"
+            )
 
         self._queues = queues
+        """A tuple of queues to be managed."""
         self._weights = weights
+        """A tuple of weights corresponding to each queue."""
 
+        # create a list of indices according to their weights
         _weights = []
         for item in [[index] * weight for index, weight in enumerate(weights)]:
             _weights.extend(item)
         random.shuffle(_weights)  # dequeue to be more fair
 
         self._weight_queue = queue.Queue()
+        """A queue that holds the indices of the queues according to their weights."""
+        # fill the weight queue with indices of queues according to their weights
         for weight in _weights:
             self._weight_queue.put(weight)
 
         self._queue_to_finish = 0
+        """The index of the queue that is currently being finished. It is increased when the last item in the queue is processed."""
         self._mutex = threading.Lock()
+        """A mutex to ensure that only one thread can access the queue at a time (critical section)."""
 
     def __len__(self):
         return len(self._queues)
 
-    def join(self):
+    def join(self) -> None:
+        """Waits for all queues to be processed."""
         for key, act_queue in enumerate(self._queues):
             act_queue.join()
 
-    def _increase_weight(self, index: int, thread_number: int):
+    def _increase_weight(self, index: int, thread_number: int) -> None:
+        """Increases the index of the queue which is currently being finished.
+
+        Arguments:
+            index (int): The index of the queue to increase the weight for.
+            thread_number (int): The number of the thread that is trying to increase the weight.
+        """
+        # the last queue cannot be skipped
         if index == len(self) - 1:
             return
 
@@ -233,11 +278,23 @@ class QueuePool:
 
         if self._queue_to_finish == index:
             v_print(
-                V.V, f"Thread {thread_number}: increasing queue index {self._queue_to_finish}++"
+                V.V,
+                f"Thread {thread_number}: increasing queue index {self._queue_to_finish}++",
             )
             self._queue_to_finish += 1
 
     def _try_to_increase_weight(self, index: int, thread_number: int) -> int:
+        """Tries to increase the weight of the queue at the given index.
+        This method acquires a mutex to ensure that only one thread can access the critical section at a time.
+
+        Arguments:
+            index (int): The index of the queue to increase the weight for.
+            thread_number (int): The number of the thread that is trying to increase the weight.
+
+        Returns:
+            int: The index of the queue that should be accessed by the thread after trying to increase the weight.
+        """
+
         v_print(V.VV, f"Thread {thread_number}: trying to acquire mutex")
         self._mutex.acquire(blocking=True)
         v_print(V.VV, f"Thread {thread_number}: mutex acquired")
@@ -257,6 +314,17 @@ class QueuePool:
         return index
 
     def fair_index(self, thread_number: int):
+        """Returns the index of the queue that should be accessed by the thread.
+        This method ensures that the access to the queues is fair and based on their weights.
+        If the queue at the returned index is empty,
+        it tries to increase the index of the queue that is currently being finished.
+
+        Arguments:
+            thread_number (int): The number of the thread that is trying to access the queue.
+
+        Returns:
+            int: The index of the queue that should be accessed by the thread.
+        """
         index = self._weight_queue.get()
 
         if self._queue_to_finish >= index and self.get_queue(index).qsize() == 0:
@@ -267,6 +335,17 @@ class QueuePool:
         return index
 
     def get_queue(self, index: int) -> queue.Queue:
+        """Returns the queue at the given index.
+
+        Arguments:
+            index (int): The index of the queue to return.
+
+        Returns:
+            queue.Queue: The queue at the given index.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+        """
         if index >= len(self._queues) or index < 0:
             raise IndexError("Queue index out of bounds")
         return self._queues[index]
@@ -291,9 +370,14 @@ ERROR_QUEUE = queue.Queue()
 
 
 def convert_chunk_size(chunk_size: str) -> int:
-    """
-    Converts user-given chunk size to integer.
+    """Converts user-given chunk size to integer.
     User can input values as number (bytes) or number + unit (eg. 32M)
+
+    Arguments:
+        chunk_size (str): The chunk size as a string, e.g. "32M", "16k", "2G".
+
+    Returns:
+        int: The chunk size in bytes, or -1 if the input is invalid.
     """
     chunk_size = chunk_size.strip()
     unit = "b"
@@ -312,7 +396,10 @@ def convert_chunk_size(chunk_size: str) -> int:
 
     units = ("b", "k", "M", "G")
     if unit not in units:
-        v_print(V.DEF, "failed while converting mapping unit, unit is not in the right format")
+        v_print(
+            V.DEF,
+            "failed while converting mapping unit, unit is not in the right format",
+        )
         return -1
 
     unit_power = units.index(unit)
@@ -322,8 +409,13 @@ def convert_chunk_size(chunk_size: str) -> int:
 
 
 def generate_random_string(size: int = 16) -> str:
-    """
-    Generates random string of characters of given size
+    """Generates random string of characters of given size
+
+    Arguments:
+        size (int): The size of the random string to generate. Default is 16.
+
+    Returns:
+        str: A random string of the specified size, or an empty string if size is negative.
     """
     if size < 0:
         return ""
@@ -334,8 +426,14 @@ def generate_random_string(size: int = 16) -> str:
 
 
 def remove_part_files(directory_to_search: str) -> bool:
-    """
-    Removes files in tree with extension defined by global value PART_FILE_EXTENSION
+    """Removes files in a tree with extension defined by global value PART_FILE_EXTENSION
+    from the given directory and its subdirectories.
+
+    Arguments:
+        directory_to_search (str): The directory to search for part files.
+
+    Returns:
+        int: 0 if successful, 1 if an error occurred.
     """
     pattern = ".*\\" + PART_FILE_EXTENSION + "$"
     try:
@@ -352,15 +450,23 @@ def remove_part_files(directory_to_search: str) -> bool:
                     else:
                         v_print(V.DEF, f"Partially downloaded file {file_path} removed")
     except OSError as e:
-        v_print(V.DEF, "failed while removing part files, exception occured:", e.__class__.__name__)
+        v_print(
+            V.DEF,
+            "failed while removing part files, exception occured:",
+            e.__class__.__name__,
+        )
         return False
 
     return True
 
 
-def verbose_print(level, *args, **kwargs):
-    """
-    Print only when VERBOSITY is equal or higher than given level.
+def verbose_print(level: int, *args, **kwargs) -> None:
+    """Prints messages to the console based on the verbosity level.
+
+    Arguments:
+        level (int): The verbosity level required to print the message.
+        *args: as usual for print function
+        **kwargs: as usual for print function
     """
     if VERBOSITY >= level:
         print(*args, **kwargs)
@@ -369,7 +475,16 @@ def verbose_print(level, *args, **kwargs):
 v_print = verbose_print
 
 
-def error_printer(response: requests.Response, thread_number: int, file: DownloadableItem):
+def error_printer(
+    response: requests.Response, thread_number: int, file: DownloadableItem
+) -> None:
+    """Prints error messages when the download fails.
+
+    Arguments:
+        response (requests.Response): The HTTP response object containing the error.
+        thread_number (int): The number of the thread that encountered the error.
+        file (DownloadableItem): The file that was being downloaded when the error occurred.
+    """
     v_print(V.DEF, "failed", end="")
     response_json = response.json()
 
@@ -381,7 +496,10 @@ def error_printer(response: requests.Response, thread_number: int, file: Downloa
         and response_json["error"]["details"]["errno"] in ("eaccess", "enoent")
     ):
         if "eacces" in response_json["error"]["details"]["errno"]:
-            v_print(V.DEF, f"Downloading of {file.path} failed, response error: permission denied")
+            v_print(
+                V.DEF,
+                f"Downloading of {file.path} failed, response error: permission denied",
+            )
         if "enoent" in response_json["error"]["details"]["errno"]:
             v_print(
                 V.DEF,
@@ -399,11 +517,23 @@ def error_printer(response: requests.Response, thread_number: int, file: Downloa
 def chunkwise_downloader(
     request: requests.Response, file: DownloadableItem, thread_number: int
 ) -> int:
+    """Downloads the file in chunks and writes it to the part file.
+
+    Arguments:
+        request (requests.Response): The HTTP response object containing the file content.
+        file (DownloadableItem): The file to download.
+        thread_number (int): The number of the thread performing the download.
+
+    Returns:
+        int: 0 if successful, 1 if an error occurred.
+    """
     try:
         with open(
             file.part_path, "ab"
         ) as f:  # if file was already opened and written into, it will continue
-            for chunk in request.iter_content(chunk_size=CHUNK_SIZE, decode_unicode=True):
+            for chunk in request.iter_content(
+                chunk_size=CHUNK_SIZE, decode_unicode=True
+            ):
                 # for chunk in request.iter_content():
                 f.write(chunk)
                 # flushing automatically as OS says
@@ -417,16 +547,28 @@ def chunkwise_downloader(
     return 0
 
 
-def renamer(file: DownloadableItem, thread_number: int):
+def renamer(file: DownloadableItem, thread_number: int) -> int:
+    """Renames the part file to the final file name.
+
+    Arguments:
+        file (DownloadableItem): The file to rename.
+        thread_number (int): The number of the thread performing the operation.
+
+    Returns:
+        int: 0 if successful, 1 if an error occurred.
+    """
     try:
         os.rename(file.part_path, file.path)
         FINISHED_FILES.put(file.path)
 
-        v_print(V.VV, f"Thread {thread_number}: {file.part_filename} renamed to {file.path}")
+        v_print(
+            V.VV, f"Thread {thread_number}: {file.part_filename} renamed to {file.path}"
+        )
         v_print(V.V, f"Thread {thread_number}:", end=" ")
     except OSError:
         v_print(
-            V.V, f"Thread {thread_number}: could not rename {file.part_filename} to {file.path}"
+            V.V,
+            f"Thread {thread_number}: could not rename {file.part_filename} to {file.path}",
         )
         return 1
 
@@ -434,11 +576,10 @@ def renamer(file: DownloadableItem, thread_number: int):
 
 
 def download_file(file: DownloadableItem, thread_number: int):
-    """
-    Download file with given file_id to given directory.
-    """
+    """Download file with given file_id to given directory."""
     v_print(
-        V.VV, f"download_file({file.onezone}, {file.file_id}, {file.node_name}, {file.directory})"
+        V.VV,
+        f"download_file({file.onezone}, {file.file_id}, {file.node_name}, {file.directory})",
     )
     # don't download the file when it exists
 
@@ -467,8 +608,13 @@ def download_file(file: DownloadableItem, thread_number: int):
     ) as request:
         if request.status_code == 416:
             v_print(V.VV, f"Thread {thread_number}:", end=" ")
-            v_print(V.V, "got status code 416 while downloading, trying to get the original size")
-            with requests.get(file.URL.content, allow_redirects=True, stream=True) as request_size:
+            v_print(
+                V.V,
+                "got status code 416 while downloading, trying to get the original size",
+            )
+            with requests.get(
+                file.URL.content, allow_redirects=True, stream=True
+            ) as request_size:
                 original_size = request_size.headers.get("content-length")
                 if already_downloaded != original_size:
                     v_print(
@@ -477,7 +623,10 @@ def download_file(file: DownloadableItem, thread_number: int):
                         f"file size: {original_size}",
                     )
                     return 5
-                v_print(V.V, f"the original size does matches, the size is: {already_downloaded}")
+                v_print(
+                    V.V,
+                    f"the original size does matches, the size is: {already_downloaded}",
+                )
         else:
             if not request.ok:
                 error_printer(request, thread_number, file)
@@ -494,7 +643,7 @@ def download_file(file: DownloadableItem, thread_number: int):
     return 0
 
 
-def process_directory(onezone, file_id, file_name, directory):
+def process_directory(onezone: str, file_id, file_name: str, directory: str):
     """
     Process directory and recursively its content.
     """
@@ -534,7 +683,10 @@ def process_directory(onezone, file_id, file_name, directory):
             child_file_id = child["file_id"]
         else:
             child_file_id = child["id"]
-        result = process_node(onezone, child_file_id, directory + os.sep + file_name) or result
+        result = (
+            process_node(onezone, child_file_id, directory + os.sep + file_name)
+            or result
+        )
 
     return result
 
@@ -577,7 +729,9 @@ def process_node(onezone: str, file_id: str, directory: str):
             result = process_directory(onezone, file_id, node_name, directory) or result
         else:
             v_print(V.DEF, "Error: unknown node type")
-            v_print(V.V, "returned node type", node_type, " of node with File ID =", file_id)
+            v_print(
+                V.V, "returned node type", node_type, " of node with File ID =", file_id
+            )
             v_print(V.V, response.json())
             return 2
 
@@ -607,7 +761,9 @@ def clean_onezone(onezone):
     try:
         response = requests.get(url)
     except Exception as e:
-        v_print(V.DEF, "Error: failure while trying to communicate with Onezone:", onezone)
+        v_print(
+            V.DEF, "Error: failure while trying to communicate with Onezone:", onezone
+        )
         v_print(V.V, str(e))
         sys.exit(2)
 
@@ -635,8 +791,16 @@ def clean_onezone(onezone):
 
 
 def clean_directory(directory):
-    """
-    Test if given directory is correct.
+    """Checks if the given directory exists, and if not, tries to create it.
+
+    Arguments:
+        directory (str): The directory to check
+
+    Returns:
+        int: 0 if the directory exists or was created successfully, 1 if an error occurred.
+
+    Raises:
+        SystemExit: If the directory cannot be created.
     """
     # test if given directory exists
     if not os.path.isdir(directory):
@@ -646,7 +810,15 @@ def clean_directory(directory):
     return directory
 
 
-def thread_worker(thread_number: int):
+def thread_worker(thread_number: int) -> int:
+    """Worker function for each thread to download files from the queue.
+
+    Arguments:
+        thread_number (int): The number of the thread.
+
+    Returns:
+        int: Return code indicating success (0) or various error states.
+    """
     while True:
         queue_index = QP.fair_index(thread_number)
         actual_queue = QP.get_queue(queue_index)
@@ -673,7 +845,9 @@ def thread_worker(thread_number: int):
             if result != 0:
                 QP.get_queue(1).put(downloadable_item)
         else:
-            ERROR_QUEUE.put(f"The file {downloadable_item.path} could not be downloaded")
+            ERROR_QUEUE.put(
+                f"The file {downloadable_item.path} could not be downloaded"
+            )
 
         actual_queue.task_done()
 
@@ -741,6 +915,12 @@ def print_download_statistics(directory_to_search: str, finished: bool = True):
 
 
 def setup_parser() -> argparse.ArgumentParser:
+    """Sets up the command line argument parser for the script.
+    Lists all available options and their defaults.
+
+    Returns:
+        argparse.ArgumentParser: Configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         description="Script allowing you to download a complete shared space, directory or a single file from the Onedata system."
     )
@@ -779,12 +959,28 @@ def setup_parser() -> argparse.ArgumentParser:
         default=0,
         help="Set verbose (debug) prints. There are two levels of these prints.",
     )
-    parser.add_argument("file_id", type=str, help="Public File ID of shared space, directory or a file")
+    parser.add_argument(
+        "file_id", type=str, help="Public File ID of shared space, directory or a file"
+    )
 
     return parser
 
 
-def process_parser(parser: argparse.ArgumentParser):
+def process_parser(parser: argparse.ArgumentParser) -> int:
+    """Processes the command line arguments and sets global variables accordingly.
+
+    Arguments:
+        parser (argparse.ArgumentParser): The argument parser with defined options.
+
+    Returns:
+        int: Return code indicating success (0) or various error states.
+
+        - 1: Invalid Onezone URL.
+        - 2: Invalid directory.
+        - 3: Invalid chunk size.
+        - 4: Invalid number of threads.
+        - 5: Error while removing part files.
+    """
     args = parser.parse_args()
 
     # set up verbosity level
@@ -815,6 +1011,19 @@ def process_parser(parser: argparse.ArgumentParser):
 
 
 def main():
+    """Main function to execute the script.
+
+    Returns:
+        int: Return code indicating success (0) or various error states.
+
+        - 0: Success.
+        - 1: Invalid Onezone URL.
+        - 2: Invalid directory.
+        - 3: Invalid chunk size.
+        - 4: Invalid number of threads.
+        - 5: Error while removing part files.
+        - 6: Error while processing the node.
+    """
     parser = setup_parser()
     result = process_parser(parser)
     if result != 0:
@@ -834,7 +1043,9 @@ def main():
         v_print(V.DEF, "Downloading files")
         for thread_number in range(THREADS_NUMBER):
             result = (
-                threading.Thread(target=thread_worker, args=(thread_number,), daemon=True).start()
+                threading.Thread(
+                    target=thread_worker, args=(thread_number,), daemon=True
+                ).start()
                 or result
             )
         QP.join()
