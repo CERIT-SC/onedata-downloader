@@ -29,13 +29,13 @@ except ImportError:
     sys.exit(1)
 
 
-class VERBOSITY:
+class Verbosity:
     DEF = 0
     V = 1
     VV = 2
 
 
-V = VERBOSITY
+V = Verbosity
 
 """Max (lowest) priority for downloading the file 
 """
