@@ -1237,7 +1237,8 @@ def main():
         v_print(V.DEF, "Exploring and creating the directory structure")
         result = Processors.process_node(ONEZONE, FILE_ID, DIRECTORY)
         if result:
-            LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
+            if ROOT_DIRECTORY_SIZE != 0:
+                LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
             return result
 
         v_print(V.DEF, "Downloading files")
