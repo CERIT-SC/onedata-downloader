@@ -6,6 +6,7 @@ The script allows you to recursively download an entire directory structure or e
 """
 
 import argparse
+import time
 import os
 import sys
 import random
@@ -96,6 +97,8 @@ FILE_ID: Optional[str] = None
 Timeout for queue blocking operations.
 """
 TIMEOUT = 1
+
+TIME_START: int = -1
 
 
 def priority_subtractor():
@@ -697,6 +700,7 @@ class LoggingUtils:
             directory_to_search (Path): The directory to search for downloaded files.
             finished (bool): Whether the download process was finished correctly or not.
         """
+        time_stop = time.time_ns()
 
         errors = ERROR_QUEUE.qsize()
 
@@ -722,6 +726,12 @@ class LoggingUtils:
         downloaded_size = finished_size + part_size
 
         print()
+        if TIME_START == -1:
+            time_elapsed = 0
+        else:
+            time_elapsed = (time_stop - TIME_START) // 1_000_000_000
+
+        print(f"Time elapsed: {time_elapsed} seconds")
         if errors != 0:
             print("Errors during execution:")
             while not ERROR_QUEUE.empty():
@@ -1318,6 +1328,8 @@ def main():
         - 5: Error while removing part files.
         - 6: Error while processing the node.
     """
+    global TIME_START
+
     parser = ArgumentsUtils.setup_parser()
     result = ArgumentsUtils.process_parser(parser)
     if result != 0:
@@ -1343,6 +1355,7 @@ def main():
             return 0
 
         v_print(V.DEF, "Downloading files")
+        TIME_START = time.time_ns()
         for thread_number in range(THREADS_NUMBER):
             result = (
                 threading.Thread(
