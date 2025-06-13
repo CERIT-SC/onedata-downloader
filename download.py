@@ -961,7 +961,7 @@ class Processors:
         else:
             v_print(
                 V.DEF,
-                "Error: Failed to retrieve information about the node. The requested node may not exist.",
+                f"Error: Failed to retrieve information about the node (file/directory). The requested node may not exist on the selected Onezone ({ONEZONE}).",
             )
             v_print(V.V, "requested node File ID =", file_id)
             v_print(V.V, response.json())
