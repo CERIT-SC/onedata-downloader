@@ -1023,7 +1023,7 @@ class Processors:
             # check if a node is directory or folder
             if node_type == "REG" or node_type == "SYMLNK":
                 ALL_FILES += 1
-                node_path = os.path.join(directory, node_name)
+                node_path = directory / node_name
                 if os.path.exists(node_path):
                     EXISTENT_FILES.put(node_path)
                     v_print(
@@ -1157,7 +1157,7 @@ class OnedataUtils:
         Returns:
             int: The Onezone URL if valid, or 2 if an error occurred.
         """
-        v_print(V.V, "Use Onezone:", onezone)
+        v_print(V.V, "Using Onezone:", onezone)
 
         # test if such Onezone exists
         url = onezone + ONEZONE_API + "configuration"
