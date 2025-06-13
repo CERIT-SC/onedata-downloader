@@ -471,6 +471,38 @@ class Utils:
         return chunk_size
 
     @staticmethod
+    def create_human_readable_size(
+        size: int, bits: bool = False, si_multiplier: bool = False
+    ) -> str:
+        """Converts size in bytes to a human-readable format.
+
+        Arguments:
+            size (int): The size in bytes.
+            bits (bool): If True, returns size in bits instead of bytes. Default is False.
+            si_multiplier (bool): If True, uses SI units (1000) instead of binary units (1024). Default is False.
+
+        Returns:
+            str: The size in a human-readable format, e.g. "32 MB", "1.5 GB".
+        """
+        if size < 0:
+            return "0 B"
+
+        multiplier = 1000.0 if si_multiplier else 1024.0
+        unit = "B" if not bits else "b"
+        unit_prefixes = (
+            ["", "k", "M", "G", "T", "P"]
+            if si_multiplier
+            else ["", "ki", "Mi", "Gi", "Ti", "Pi"]
+        )
+
+        unit_index = 0
+        while size >= multiplier and unit_index < len(unit_prefixes) - 1:
+            size /= multiplier
+            unit_index += 1
+
+        return f"{size:.2f} {unit_prefixes[unit_index]}{unit}"
+
+    @staticmethod
     def generate_random_string(size: int = 16) -> str:
         """Generates random string of characters of given size
 
