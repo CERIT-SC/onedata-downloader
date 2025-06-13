@@ -81,6 +81,11 @@ Number of seconds between two tries to download the file
 """
 TRIES_DELAY: int = 1
 
+"""
+If set to True, the script will only print statistics and not download any files.
+"""
+ONLY_STATS: bool = False
+
 ONEZONE: str = DEFAULT_ONEZONE
 
 DIRECTORY: Path = Path(".")
@@ -674,6 +679,17 @@ class LoggingUtils:
         v_print(V.V, f"Thread {thread_number}:", response_json)
 
     @staticmethod
+    def print_predownload_statistics():
+        print()
+        print("Pre-download statistics:")
+        print(
+            f"Contains: {ALL_FILES} files, {ALL_DIRECTORIES} directories ({ALL_FILES + ALL_DIRECTORIES} elements in total)"
+        )
+        human_readable_size = Utils.create_human_readable_size(ROOT_DIRECTORY_SIZE)
+        print(f"Logical size: {human_readable_size} ({ROOT_DIRECTORY_SIZE} bytes)")
+        print()
+
+    @staticmethod
     def print_download_statistics(directory_to_search: Path, finished: bool = True):
         """Prints statistics about the download process.
 
@@ -1223,6 +1239,12 @@ class ArgumentsUtils:
             type=str,
             help="Public File ID of shared space, directory or a file",
         )
+        parser.add_argument(
+            "-s",
+            "--statistics_only",
+            action="store_true",
+            help="Print only statistics without downloading the data",
+        )
 
         return parser
 
@@ -1276,6 +1298,9 @@ class ArgumentsUtils:
         global FILE_ID
         FILE_ID = args.file_id
 
+        global ONLY_STATS
+        ONLY_STATS = args.statistics_only
+
         return 0
 
 
@@ -1308,6 +1333,14 @@ def main():
         if result:
             LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
             return result
+        LoggingUtils.print_predownload_statistics()
+        if ONLY_STATS:
+            v_print(V.DEF, "Statistics only mode, exiting")
+            return 0
+
+        if QP.get_queue(0).qsize() == 0:
+            v_print(V.DEF, "All the files are already downloaded or existent")
+            return 0
 
         v_print(V.DEF, "Downloading files")
         for thread_number in range(THREADS_NUMBER):
