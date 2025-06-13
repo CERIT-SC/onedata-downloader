@@ -712,6 +712,18 @@ class LoggingUtils:
                 print(ERROR_QUEUE.get())
             print()
 
+        not_downloaded_or_error_size = ROOT_DIRECTORY_SIZE - (
+            finished_size + existent_size + part_size
+        )
+        downloaded_human = Utils.create_human_readable_size(downloaded_size)
+        root_directory_human = Utils.create_human_readable_size(ROOT_DIRECTORY_SIZE)
+        finished_human = Utils.create_human_readable_size(finished_size)
+        existent_human = Utils.create_human_readable_size(existent_size)
+        part_human = Utils.create_human_readable_size(part_size)
+        not_downloaded_or_error_human = Utils.create_human_readable_size(
+            not_downloaded_or_error_size
+        )
+
         print("Download statistics:")
         if ALL_FILES != 0:
             print(
@@ -722,23 +734,48 @@ class LoggingUtils:
                 f"Files created: 0, already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}"
             )
         if ALL_DIRECTORIES != 0:
+            directories_created_percent = DIRECTORIES_CREATED / ALL_DIRECTORIES * 100
+            directories_already_existent = ALL_DIRECTORIES - (
+                DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED
+            )
             print(
-                f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED / ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
+                f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({directories_created_percent:.2f}%), already existent: {directories_already_existent}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
             )
         else:
+            directories_already_existent = ALL_DIRECTORIES - (
+                DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED
+            )
             print(
-                f"Directories created: 0, already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
+                f"Directories created: 0, already existent: {directories_already_existent}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
             )
         if ROOT_DIRECTORY_SIZE != 0:
+            downloaded_size_percent = downloaded_size / ROOT_DIRECTORY_SIZE * 100
             print(
-                f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size / ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
+                f"Downloaded size: {downloaded_human}/{root_directory_human} ({downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes) ({downloaded_size_percent:.2f}%), finished: {finished_human} ({finished_size} bytes), existent: {existent_human} ({existent_size} bytes), part files: {part_human} ({part_size} bytes), not downloaded yet or error: {not_downloaded_or_error_human} ({not_downloaded_or_error_size} bytes)"
             )
         else:
             print(
-                f"Downloaded size: 0 bytes, finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
+                f"Downloaded size: 0 bytes, finished: {finished_human} ({finished_size} bytes), existent: {existent_human} ({existent_size} bytes), part files: {part_human} ({part_size} bytes), not downloaded yet or error: {not_downloaded_or_error_human} ({not_downloaded_or_error_size} bytes)"
             )
+
+        if time_elapsed != 0:
+            average_speed = downloaded_size * 8 / time_elapsed
+            average_speed_bytes = downloaded_size / time_elapsed
+            average_speed_human = Utils.create_human_readable_size(
+                average_speed, bits=True, si_multiplier=True
+            )
+            average_speed_bytes_human = Utils.create_human_readable_size(
+                average_speed_bytes
+            )
+            print(
+                f"Average download speed: {average_speed_human}/s or {average_speed_bytes_human}/s ({average_speed:.2f} bits/s or {average_speed_bytes:.2f} Bytes/s)",
+                flush=True,
+            )
+
         if not finished:
-            print("RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY")
+            print(
+                "RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY", flush=True
+            )
 
 
 v_print = LoggingUtils.verbose_print
