@@ -952,50 +952,7 @@ class Processors:
             V.VV, "Response came from %s://%s" % (parsed_url.scheme, parsed_url.netloc)
         )
 
-        if response.ok:
-            response_json = response.json()
-            node_type = response_json["type"].upper()
-            node_name = response_json["name"]
-            node_size = response_json["size"]
-
-            if node_size > ROOT_DIRECTORY_SIZE:
-                ROOT_DIRECTORY_SIZE = node_size
-
-            result = 0
-            # check if a node is directory or folder
-            if node_type == "REG" or node_type == "SYMLNK":
-                ALL_FILES += 1
-                node_path = os.path.join(directory, node_name)
-                if os.path.exists(node_path):
-                    EXISTENT_FILES.put(node_path)
-                    v_print(
-                        V.DEF, f"File {node_path} exists, it will not be downloaded"
-                    )
-                    return 0
-
-                v_print(V.V, "Adding file to queue", node_path)
-                file_queue = QP.get_queue(0)
-                file_queue.put(DownloadableItem(onezone, file_id, node_name, directory))
-            elif node_type == "DIR":
-                ALL_DIRECTORIES += 1
-                result = (
-                    Processors.process_directory(onezone, file_id, node_name, directory)
-                    or result
-                )
-            else:
-                v_print(V.DEF, "Error: Unknown node type")
-                v_print(
-                    V.V,
-                    "returned node type",
-                    node_type,
-                    " of node with File ID =",
-                    file_id,
-                )
-                v_print(V.V, response.json())
-                return 2
-
-            return result
-        else:
+        if not response.ok:
             v_print(
                 V.DEF,
                 "Error: Failed to retrieve information about the node. The requested node may not exist.",
@@ -1003,6 +960,49 @@ class Processors:
             v_print(V.V, "requested node File ID =", file_id)
             v_print(V.V, response.json())
             return 1
+
+        response_json = response.json()
+        node_type = response_json["type"].upper()
+        node_name = response_json["name"]
+        node_size = response_json["size"]
+
+        # setting the global size of the download, the directories in Onedata
+        # have cumulative size, so the biggest one will be the root
+        if node_size > ROOT_DIRECTORY_SIZE:
+            ROOT_DIRECTORY_SIZE = node_size
+
+        result = 0
+        # check if a node is directory or folder
+        if node_type == "REG" or node_type == "SYMLNK":
+            ALL_FILES += 1
+            node_path = os.path.join(directory, node_name)
+            if os.path.exists(node_path):
+                EXISTENT_FILES.put(node_path)
+                v_print(V.DEF, f"File {node_path} exists, it will not be downloaded")
+                return 0
+
+            v_print(V.V, "Adding file to queue", node_path)
+            file_queue = QP.get_queue(0)
+            file_queue.put(DownloadableItem(onezone, file_id, node_name, directory))
+        elif node_type == "DIR":
+            ALL_DIRECTORIES += 1
+            result = (
+                Processors.process_directory(onezone, file_id, node_name, directory)
+                or result
+            )
+        else:
+            v_print(V.DEF, "Error: Unknown node type")
+            v_print(
+                V.V,
+                "returned node type",
+                node_type,
+                " of node with File ID =",
+                file_id,
+            )
+            v_print(V.V, response.json())
+            return 2
+
+        return result
 
     @staticmethod
     def thread_worker(thread_number: int) -> int:
