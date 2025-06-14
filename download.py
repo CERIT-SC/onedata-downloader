@@ -6,6 +6,7 @@ The script allows you to recursively download an entire directory structure or e
 """
 
 import argparse
+import json
 import os
 import sys
 import random
@@ -878,35 +879,79 @@ class Processors:
         return response
 
     @staticmethod
-    def process_directory(onezone: str, file_id, file_name: str, directory: Path):
+    def process_directory(
+        onezone: str,
+        file_id,
+        file_name: str,
+        directory: Path,
+        token: Optional[str] = None,
+    ):
+        """Process given directory in Onezone and create it in the local filesystem.
+        This function retrieves the contents of a directory in Onezone and creates a corresponding
+        directory in the local filesystem. It also processes all child nodes (files and subdirectories)
+        within that directory. The function handles pagination using a continuation token if provided.
+
+        https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/list_children
+
+        Arguments:
+            onezone (str): The Onezone service URL.
+            file_id (str): The unique identifier of the directory in Onezone.
+            file_name (str): The name of the directory to create.
+            directory (Path): The path where the directory should be created.
+            token (Optional[str]): Optional continuation token for Onezone API.
+
+        Returns:
+            int: 0 if successful, 1 if an error occurred, 2 if the directory could not be created.
         """
-        Process directory and recursively its content.
-        """
+        DIFFERENT_BEHAVIOUR_VERSION = "21.02.1"
         v_print(
             V.VV, f"process_directory({onezone}, {file_id}, {file_name}, {directory})"
         )
         global ALL_DIRECTORIES
         global DIRECTORIES_CREATED
         global DIRECTORIES_NOT_CREATED_OS_ERROR
+
         # don't create the the directory when it exists
-        v_print(V.DEF, "Processing directory", directory / file_name, flush=True)
+        directory_to_create = directory / file_name
+        v_print(V.DEF, "Processing directory", directory_to_create, flush=True)
         try:
-            os.mkdir(directory / file_name, mode=0o777)
+            os.mkdir(directory_to_create, mode=0o777)
             DIRECTORIES_CREATED += 1
-            v_print(V.V, "directory created")
+            v_print(V.V, f"Directory {directory_to_create} created")
         except FileExistsError:  # directory already existent
-            v_print(V.DEF, "directory exists, not created")
+            v_print(V.DEF, f"Directory {directory_to_create} exists, not created")
         except FileNotFoundError as e:  # parent directory non existent
             DIRECTORIES_NOT_CREATED_OS_ERROR += 1
-            v_print(V.DEF, "failed, exception occured:", e.__class__.__name__)
+            v_print(V.DEF, "Failed, exception occured:", e.__class__.__name__)
             v_print(V.V, str(e))
             return 2
 
-        # get content of new directory
+        # Warning: there might be an error, when the version of Onezone is over
+        # 21.02.1, but the version of Oneprovider is lower than 21.02.1.
+        # In that situation, the response_json["nextPageToken"] will not
+        # be present and the program will crash.
+        # If it is the other way around (the Onezone is lower version),
+        # the response_json["nextPageToken"] will be present, however the
+        # program will not check.
+        # It might be a potential improvement in the future, but it will
+        # be a visible performance hit, as we need to double the number
+        # of requests to the Onezone API.
+        body = None
+        headers = {}
+        if ONEZONE_FULL_VERSION >= DIFFERENT_BEHAVIOUR_VERSION:
+            v_print(
+                V.VV,
+                f"Using continuation token for Onezone API, API version {ONEZONE_FULL_VERSION} >= 21.02.1",
+            )
+            body = json.dumps({"token": token})
+            headers = {"Content-Type": "application/json"}
 
+        # get content of new directory
         children_url = URLs(onezone, file_id).children
         v_print(V.VV, "Requesting children from %s" % (children_url,))
-        response = requests.get(children_url)
+        response = Processors.request_processor(
+            "GET", children_url, headers=headers, data=body
+        )
         parsed_url = urlparse(response.url)
         v_print(
             V.VV, "Response came from %s://%s" % (parsed_url.scheme, parsed_url.netloc)
@@ -930,6 +975,23 @@ class Processors:
                 Processors.process_node(onezone, child_file_id, directory / file_name)
                 or result
             )
+
+        if ONEZONE_FULL_VERSION >= DIFFERENT_BEHAVIOUR_VERSION:
+            if not response_json["isLast"]:
+                v_print(
+                    V.VV,
+                    "It was not the last page of results, continuing with token",
+                )
+                result = (
+                    Processors.process_directory(
+                        onezone,
+                        file_id,
+                        file_name,
+                        directory,
+                        token=response_json["nextPageToken"],
+                    )
+                    or result
+                )
 
         return result
 
