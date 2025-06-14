@@ -1099,6 +1099,7 @@ class OnedataUtils:
         Returns:
             int: The Onezone URL if valid, or 2 if an error occurred.
         """
+        global ONEZONE_FULL_VERSION
         v_print(V.V, "Use Onezone:", onezone)
 
         # test if such Onezone exists
