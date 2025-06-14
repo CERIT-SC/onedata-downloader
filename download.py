@@ -88,6 +88,11 @@ DIRECTORY: Path = Path(".")
 FILE_ID: Optional[str] = None
 
 """
+The full version (major.minor.patch) of the Onezone 
+"""
+ONEZONE_FULL_VERSION: Optional[str] = None
+
+"""
 Timeout for queue blocking operations.
 """
 TIMEOUT = 1
@@ -1092,12 +1097,12 @@ class OnedataUtils:
                 e.__class__.__name__,
             )
             return 2
-
+        ONEZONE_FULL_VERSION = response_json["version"]
         # get Onezone version
-        onezone_version = response_json["version"].split(".")[
+        onezone_major_version = ONEZONE_FULL_VERSION.split(".")[
             0
         ]  # 21.02.0-alpha28 -> 21
-        v_print(V.V, "Onezone version:", onezone_version)
+        v_print(V.V, "Onezone version:", onezone_major_version)
 
         return 0
 
