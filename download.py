@@ -1147,7 +1147,7 @@ class OnedataUtils:
         """
         if not OnedataUtils.is_valid_onezone_scheme(onezone):
             v_print(V.DEF, "Invalid Onezone URL format, canonizing:", onezone)
-            onezone = "http://" + onezone
+            onezone = "https://" + onezone
 
         return onezone
 
