@@ -903,7 +903,6 @@ class Processors:
         Returns:
             int: 0 if successful, 1 if an error occurred, 2 if the directory could not be created.
         """
-        DIFFERENT_BEHAVIOUR_VERSION = "21.02.1"
         v_print(
             V.VV, f"process_directory({onezone}, {file_id}, {file_name}, {directory})"
         )
@@ -926,22 +925,12 @@ class Processors:
             v_print(V.V, str(e))
             return 2
 
-        # Warning: there might be an error, when the version of Onezone is over
-        # 21.02.1, but the version of Oneprovider is lower than 21.02.1.
-        # In that situation, the response_json["nextPageToken"] will not
-        # be present and the program will crash.
-        # If it is the other way around (the Onezone is lower version),
-        # the response_json["nextPageToken"] will be present, however the
-        # program will not check.
-        # It might be a potential improvement in the future, but it will
-        # be a visible performance hit, as we need to double the number
-        # of requests to the Onezone API.
         body = None
         headers = {}
-        if ONEZONE_FULL_VERSION >= DIFFERENT_BEHAVIOUR_VERSION:
+        if token is not None:
             v_print(
                 V.VV,
-                f"Using continuation token for Onezone API, API version {ONEZONE_FULL_VERSION} >= 21.02.1",
+                f"Using continuation token for Onezone/Oneprovider API",
             )
             body = json.dumps({"token": token})
             headers = {"Content-Type": "application/json"}
@@ -976,11 +965,15 @@ class Processors:
                 or result
             )
 
-        if ONEZONE_FULL_VERSION >= DIFFERENT_BEHAVIOUR_VERSION:
+        if (
+            response_json.get("nextPageToken") is not None
+            and response_json.get("isLast") is not None
+        ):
+            v_print(V.VV, "The continuation token found, the Onezone supports it")
             if not response_json["isLast"]:
                 v_print(
                     V.VV,
-                    "It was not the last page of results, continuing with token",
+                    "It was not the last page of results, continuing with the token",
                 )
                 result = (
                     Processors.process_directory(
@@ -992,6 +985,8 @@ class Processors:
                     )
                     or result
                 )
+            else:
+                v_print(V.VV, "It was the last page of results")
 
         return result
 
