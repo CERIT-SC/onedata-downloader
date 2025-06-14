@@ -846,6 +846,38 @@ class Processors:
         return 0
 
     @staticmethod
+    def request_processor(
+        method: str, url: str, headers: dict = None, data: str = None
+    ):
+        """Processes a request to the given URL with the specified method, headers, and data.
+        This function handles redirects and retries the request if it receives a redirect response with the same data and headers.
+        Arguments:
+            method (str): The HTTP method to use for the request (e.g., 'GET', 'POST').
+            url (str): The URL to which the request is sent.
+            headers (dict, optional): Optional headers to include in the request.
+            data (str, optional): Optional data to include in the request body.
+        Returns:
+            requests.Response: The response object from the request.
+        """
+        v_print(V.VV, f"Requesting {method} {url}")
+
+        response = requests.request(
+            method, url, headers=headers, data=data, allow_redirects=False
+        )
+
+        while response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
+            v_print(
+                V.VV,
+                f"Received redirect response: {response.status_code}, redirecting to {response.headers['Location']}",
+            )
+            redirect_url = response.headers["Location"]
+            response = requests.request(
+                method, redirect_url, headers=headers, data=data, allow_redirects=False
+            )
+
+        return response
+
+    @staticmethod
     def process_directory(onezone: str, file_id, file_name: str, directory: Path):
         """
         Process directory and recursively its content.
