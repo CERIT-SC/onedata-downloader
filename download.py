@@ -6,6 +6,7 @@ The script allows you to recursively download an entire directory structure or e
 """
 
 import argparse
+import json
 import time
 import os
 import sys
@@ -92,6 +93,11 @@ ONEZONE: str = DEFAULT_ONEZONE
 DIRECTORY: Path = Path(".")
 
 FILE_ID: Optional[str] = None
+
+"""
+The full version (major.minor.patch) of the Onezone 
+"""
+ONEZONE_FULL_VERSION: Optional[str] = None
 
 """
 Timeout for queue blocking operations.
@@ -936,9 +942,61 @@ class Processors:
         return 0
 
     @staticmethod
-    def process_directory(onezone: str, file_id, file_name: str, directory: Path):
+    def request_processor(
+        method: str, url: str, headers: dict = None, data: str = None
+    ):
+        """Processes a request to the given URL with the specified method, headers, and data.
+        This function handles redirects and retries the request if it receives a redirect response with the same data and headers.
+        Arguments:
+            method (str): The HTTP method to use for the request (e.g., 'GET', 'POST').
+            url (str): The URL to which the request is sent.
+            headers (dict, optional): Optional headers to include in the request.
+            data (str, optional): Optional data to include in the request body.
+        Returns:
+            requests.Response: The response object from the request.
         """
-        Process directory and recursively its content.
+        v_print(V.VV, f"Requesting {method} {url}")
+
+        response = requests.request(
+            method, url, headers=headers, data=data, allow_redirects=False
+        )
+
+        while response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
+            v_print(
+                V.VV,
+                f"Received redirect response: {response.status_code}, redirecting to {response.headers['Location']}",
+            )
+            redirect_url = response.headers["Location"]
+            response = requests.request(
+                method, redirect_url, headers=headers, data=data, allow_redirects=False
+            )
+
+        return response
+
+    @staticmethod
+    def process_directory(
+        onezone: str,
+        file_id,
+        file_name: str,
+        directory: Path,
+        token: Optional[str] = None,
+    ):
+        """Process given directory in Onezone and create it in the local filesystem.
+        This function retrieves the contents of a directory in Onezone and creates a corresponding
+        directory in the local filesystem. It also processes all child nodes (files and subdirectories)
+        within that directory. The function handles pagination using a continuation token if provided.
+
+        https://onedata.org/#/home/api/stable/oneprovider?anchor=operation/list_children
+
+        Arguments:
+            onezone (str): The Onezone service URL.
+            file_id (str): The unique identifier of the directory in Onezone.
+            file_name (str): The name of the directory to create.
+            directory (Path): The path where the directory should be created.
+            token (Optional[str]): Optional continuation token for Onezone API.
+
+        Returns:
+            int: 0 if successful, 1 if an error occurred, 2 if the directory could not be created.
         """
         v_print(
             V.VV, f"process_directory({onezone}, {file_id}, {file_name}, {directory})"
@@ -946,25 +1004,38 @@ class Processors:
         global ALL_DIRECTORIES
         global DIRECTORIES_CREATED
         global DIRECTORIES_NOT_CREATED_OS_ERROR
+
         # don't create the the directory when it exists
-        v_print(V.DEF, "Processing directory", directory / file_name, flush=True)
+        directory_to_create = directory / file_name
+        v_print(V.DEF, "Processing directory", directory_to_create, flush=True)
         try:
-            os.mkdir(directory / file_name, mode=0o777)
+            os.mkdir(directory_to_create, mode=0o777)
             DIRECTORIES_CREATED += 1
-            v_print(V.V, "directory created")
+            v_print(V.V, f"Directory {directory_to_create} created")
         except FileExistsError:  # directory already existent
-            v_print(V.DEF, "directory exists, not created")
+            v_print(V.DEF, f"Directory {directory_to_create} exists, not created")
         except FileNotFoundError as e:  # parent directory non existent
             DIRECTORIES_NOT_CREATED_OS_ERROR += 1
-            v_print(V.DEF, "failed, exception occured:", e.__class__.__name__)
+            v_print(V.DEF, "Failed, exception occured:", e.__class__.__name__)
             v_print(V.V, str(e))
             return 2
 
-        # get content of new directory
+        body = None
+        headers = {}
+        if token is not None:
+            v_print(
+                V.VV,
+                f"Using continuation token for Onezone/Oneprovider API",
+            )
+            body = json.dumps({"token": token})
+            headers = {"Content-Type": "application/json"}
 
+        # get content of new directory
         children_url = URLs(onezone, file_id).children
         v_print(V.VV, "Requesting children from %s" % (children_url,))
-        response = requests.get(children_url)
+        response = Processors.request_processor(
+            "GET", children_url, headers=headers, data=body
+        )
         parsed_url = urlparse(response.url)
         v_print(
             V.VV, "Response came from %s://%s" % (parsed_url.scheme, parsed_url.netloc)
@@ -989,6 +1060,29 @@ class Processors:
                 or result
             )
 
+        if (
+            response_json.get("nextPageToken") is not None
+            and response_json.get("isLast") is not None
+        ):
+            v_print(V.VV, "The continuation token found, the Onezone supports it")
+            if not response_json["isLast"]:
+                v_print(
+                    V.VV,
+                    "It was not the last page of results, continuing with the token",
+                )
+                result = (
+                    Processors.process_directory(
+                        onezone,
+                        file_id,
+                        file_name,
+                        directory,
+                        token=response_json["nextPageToken"],
+                    )
+                    or result
+                )
+            else:
+                v_print(V.VV, "It was the last page of results")
+
         return result
 
     @staticmethod
@@ -1010,50 +1104,7 @@ class Processors:
             V.VV, "Response came from %s://%s" % (parsed_url.scheme, parsed_url.netloc)
         )
 
-        if response.ok:
-            response_json = response.json()
-            node_type = response_json["type"].upper()
-            node_name = response_json["name"]
-            node_size = response_json["size"]
-
-            if node_size > ROOT_DIRECTORY_SIZE:
-                ROOT_DIRECTORY_SIZE = node_size
-
-            result = 0
-            # check if a node is directory or folder
-            if node_type == "REG" or node_type == "SYMLNK":
-                ALL_FILES += 1
-                node_path = directory / node_name
-                if os.path.exists(node_path):
-                    EXISTENT_FILES.put(node_path)
-                    v_print(
-                        V.DEF, f"File {node_path} exists, it will not be downloaded"
-                    )
-                    return 0
-
-                v_print(V.V, "Adding file to queue", node_path)
-                file_queue = QP.get_queue(0)
-                file_queue.put(DownloadableItem(onezone, file_id, node_name, directory))
-            elif node_type == "DIR":
-                ALL_DIRECTORIES += 1
-                result = (
-                    Processors.process_directory(onezone, file_id, node_name, directory)
-                    or result
-                )
-            else:
-                v_print(V.DEF, "Error: Unknown node type")
-                v_print(
-                    V.V,
-                    "returned node type",
-                    node_type,
-                    " of node with File ID =",
-                    file_id,
-                )
-                v_print(V.V, response.json())
-                return 2
-
-            return result
-        else:
+        if not response.ok:
             v_print(
                 V.DEF,
                 f"Error: Failed to retrieve information about the node (file/directory). The requested node may not exist on the selected Onezone ({ONEZONE}).",
@@ -1061,6 +1112,49 @@ class Processors:
             v_print(V.V, "requested node File ID =", file_id)
             v_print(V.V, response.json())
             return 1
+
+        response_json = response.json()
+        node_type = response_json["type"].upper()
+        node_name = response_json["name"]
+        node_size = response_json["size"]
+
+        # setting the global size of the download, the directories in Onedata
+        # have cumulative size, so the biggest one will be the root
+        if node_size > ROOT_DIRECTORY_SIZE:
+            ROOT_DIRECTORY_SIZE = node_size
+
+        result = 0
+        # check if a node is directory or folder
+        if node_type == "REG" or node_type == "SYMLNK":
+            ALL_FILES += 1
+            node_path = os.path.join(directory, node_name)
+            if os.path.exists(node_path):
+                EXISTENT_FILES.put(node_path)
+                v_print(V.DEF, f"File {node_path} exists, it will not be downloaded")
+                return 0
+
+            v_print(V.V, "Adding file to queue", node_path)
+            file_queue = QP.get_queue(0)
+            file_queue.put(DownloadableItem(onezone, file_id, node_name, directory))
+        elif node_type == "DIR":
+            ALL_DIRECTORIES += 1
+            result = (
+                Processors.process_directory(onezone, file_id, node_name, directory)
+                or result
+            )
+        else:
+            v_print(V.DEF, "Error: Unknown node type")
+            v_print(
+                V.V,
+                "returned node type",
+                node_type,
+                " of node with File ID =",
+                file_id,
+            )
+            v_print(V.V, response.json())
+            return 2
+
+        return result
 
     @staticmethod
     def thread_worker(thread_number: int) -> int:
@@ -1143,7 +1237,7 @@ class OnedataUtils:
         """
         if not OnedataUtils.is_valid_onezone_scheme(onezone):
             v_print(V.DEF, "Invalid Onezone URL format, canonizing:", onezone)
-            onezone = "http://" + onezone
+            onezone = "https://" + onezone
 
         return onezone
 
@@ -1157,6 +1251,7 @@ class OnedataUtils:
         Returns:
             int: The Onezone URL if valid, or 2 if an error occurred.
         """
+        global ONEZONE_FULL_VERSION
         v_print(V.V, "Using Onezone:", onezone)
 
         # test if such Onezone exists
@@ -1187,12 +1282,12 @@ class OnedataUtils:
                 e.__class__.__name__,
             )
             return 2
-
+        ONEZONE_FULL_VERSION = response_json["version"]
         # get Onezone version
-        onezone_version = response_json["version"].split(".")[
+        onezone_major_version = ONEZONE_FULL_VERSION.split(".")[
             0
         ]  # 21.02.0-alpha28 -> 21
-        v_print(V.V, "Onezone version:", onezone_version)
+        v_print(V.V, "Onezone version:", onezone_major_version)
 
         return 0
 
