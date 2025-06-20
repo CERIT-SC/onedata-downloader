@@ -7,6 +7,7 @@ The script allows you to recursively download an entire directory structure or e
 
 import argparse
 import json
+import time
 import os
 import sys
 import random
@@ -82,6 +83,11 @@ Number of seconds between two tries to download the file
 """
 TRIES_DELAY: int = 1
 
+"""
+If set to True, the script will only print statistics and not download any files.
+"""
+ONLY_STATS: bool = False
+
 ONEZONE: str = DEFAULT_ONEZONE
 
 DIRECTORY: Path = Path(".")
@@ -97,6 +103,8 @@ ONEZONE_FULL_VERSION: Optional[str] = None
 Timeout for queue blocking operations.
 """
 TIMEOUT = 1
+
+TIME_START: int = -1
 
 
 def priority_subtractor():
@@ -477,6 +485,38 @@ class Utils:
         return chunk_size
 
     @staticmethod
+    def create_human_readable_size(
+        size: int, bits: bool = False, si_multiplier: bool = False
+    ) -> str:
+        """Converts size in bytes to a human-readable format.
+
+        Arguments:
+            size (int): The size in bytes.
+            bits (bool): If True, returns size in bits instead of bytes. Default is False.
+            si_multiplier (bool): If True, uses SI units (1000) instead of binary units (1024). Default is False.
+
+        Returns:
+            str: The size in a human-readable format, e.g. "32 MB", "1.5 GB".
+        """
+        if size < 0:
+            return "0 B"
+
+        multiplier = 1000.0 if si_multiplier else 1024.0
+        unit = "B" if not bits else "b"
+        unit_prefixes = (
+            ["", "k", "M", "G", "T", "P"]
+            if si_multiplier
+            else ["", "ki", "Mi", "Gi", "Ti", "Pi"]
+        )
+
+        unit_index = 0
+        while size >= multiplier and unit_index < len(unit_prefixes) - 1:
+            size /= multiplier
+            unit_index += 1
+
+        return f"{size:.2f} {unit_prefixes[unit_index]}{unit}"
+
+    @staticmethod
     def generate_random_string(size: int = 16) -> str:
         """Generates random string of characters of given size
 
@@ -648,6 +688,17 @@ class LoggingUtils:
         v_print(V.V, f"Thread {thread_number}:", response_json)
 
     @staticmethod
+    def print_predownload_statistics():
+        print()
+        print("Pre-download statistics:")
+        print(
+            f"Contains: {ALL_FILES} files, {ALL_DIRECTORIES} directories ({ALL_FILES + ALL_DIRECTORIES} elements in total)"
+        )
+        human_readable_size = Utils.create_human_readable_size(ROOT_DIRECTORY_SIZE)
+        print(f"Logical size: {human_readable_size} ({ROOT_DIRECTORY_SIZE} bytes)")
+        print()
+
+    @staticmethod
     def print_download_statistics(directory_to_search: Path, finished: bool = True):
         """Prints statistics about the download process.
 
@@ -655,6 +706,7 @@ class LoggingUtils:
             directory_to_search (Path): The directory to search for downloaded files.
             finished (bool): Whether the download process was finished correctly or not.
         """
+        time_stop = time.time_ns()
 
         errors = ERROR_QUEUE.qsize()
 
@@ -680,11 +732,29 @@ class LoggingUtils:
         downloaded_size = finished_size + part_size
 
         print()
+        if TIME_START == -1:
+            time_elapsed = 0
+        else:
+            time_elapsed = (time_stop - TIME_START) // 1_000_000_000
+
+        print(f"Time elapsed: {time_elapsed} seconds")
         if errors != 0:
             print("Errors during execution:")
             while not ERROR_QUEUE.empty():
                 print(ERROR_QUEUE.get())
             print()
+
+        not_downloaded_or_error_size = ROOT_DIRECTORY_SIZE - (
+            finished_size + existent_size + part_size
+        )
+        downloaded_human = Utils.create_human_readable_size(downloaded_size)
+        root_directory_human = Utils.create_human_readable_size(ROOT_DIRECTORY_SIZE)
+        finished_human = Utils.create_human_readable_size(finished_size)
+        existent_human = Utils.create_human_readable_size(existent_size)
+        part_human = Utils.create_human_readable_size(part_size)
+        not_downloaded_or_error_human = Utils.create_human_readable_size(
+            not_downloaded_or_error_size
+        )
 
         print("Download statistics:")
         if ALL_FILES != 0:
@@ -696,23 +766,48 @@ class LoggingUtils:
                 f"Files created: 0, already existent: {existent_files}, error while creating: {ALL_FILES - (existent_files + finished_files)}"
             )
         if ALL_DIRECTORIES != 0:
+            directories_created_percent = DIRECTORIES_CREATED / ALL_DIRECTORIES * 100
+            directories_already_existent = ALL_DIRECTORIES - (
+                DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED
+            )
             print(
-                f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({DIRECTORIES_CREATED / ALL_DIRECTORIES * 100:.2f}%), already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
+                f"Directories created: {DIRECTORIES_CREATED}/{ALL_DIRECTORIES} ({directories_created_percent:.2f}%), already existent: {directories_already_existent}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
             )
         else:
+            directories_already_existent = ALL_DIRECTORIES - (
+                DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED
+            )
             print(
-                f"Directories created: 0, already existent: {ALL_DIRECTORIES - (DIRECTORIES_NOT_CREATED_OS_ERROR + DIRECTORIES_CREATED)}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
+                f"Directories created: 0, already existent: {directories_already_existent}, error while creating: {DIRECTORIES_NOT_CREATED_OS_ERROR}"
             )
         if ROOT_DIRECTORY_SIZE != 0:
+            downloaded_size_percent = downloaded_size / ROOT_DIRECTORY_SIZE * 100
             print(
-                f"Downloaded size: {downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes ({downloaded_size / ROOT_DIRECTORY_SIZE * 100:.2f}%), finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
+                f"Downloaded size: {downloaded_human}/{root_directory_human} ({downloaded_size}/{ROOT_DIRECTORY_SIZE} bytes) ({downloaded_size_percent:.2f}%), finished: {finished_human} ({finished_size} bytes), existent: {existent_human} ({existent_size} bytes), part files: {part_human} ({part_size} bytes), not downloaded yet or error: {not_downloaded_or_error_human} ({not_downloaded_or_error_size} bytes)"
             )
         else:
             print(
-                f"Downloaded size: 0 bytes, finished: {finished_size} bytes, existent: {existent_size} bytes, part files: {part_size} bytes, not downloaded yet or error: {ROOT_DIRECTORY_SIZE - (finished_size + existent_size + part_size)} bytes"
+                f"Downloaded size: 0 bytes, finished: {finished_human} ({finished_size} bytes), existent: {existent_human} ({existent_size} bytes), part files: {part_human} ({part_size} bytes), not downloaded yet or error: {not_downloaded_or_error_human} ({not_downloaded_or_error_size} bytes)"
             )
+
+        if time_elapsed != 0:
+            average_speed = downloaded_size * 8 / time_elapsed
+            average_speed_bytes = downloaded_size / time_elapsed
+            average_speed_human = Utils.create_human_readable_size(
+                average_speed, bits=True, si_multiplier=True
+            )
+            average_speed_bytes_human = Utils.create_human_readable_size(
+                average_speed_bytes
+            )
+            print(
+                f"Average download speed: {average_speed_human}/s or {average_speed_bytes_human}/s ({average_speed:.2f} bits/s or {average_speed_bytes:.2f} Bytes/s)",
+                flush=True,
+            )
+
         if not finished:
-            print("RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY")
+            print(
+                "RESULTS MAY BE INCORRECT, PROGRAM DID NOT FINISH CORRECTLY", flush=True
+            )
 
 
 v_print = LoggingUtils.verbose_print
@@ -1012,7 +1107,7 @@ class Processors:
         if not response.ok:
             v_print(
                 V.DEF,
-                "Error: Failed to retrieve information about the node. The requested node may not exist.",
+                f"Error: Failed to retrieve information about the node (file/directory). The requested node may not exist on the selected Onezone ({ONEZONE}).",
             )
             v_print(V.V, "requested node File ID =", file_id)
             v_print(V.V, response.json())
@@ -1157,7 +1252,7 @@ class OnedataUtils:
             int: The Onezone URL if valid, or 2 if an error occurred.
         """
         global ONEZONE_FULL_VERSION
-        v_print(V.V, "Use Onezone:", onezone)
+        v_print(V.V, "Using Onezone:", onezone)
 
         # test if such Onezone exists
         url = onezone + ONEZONE_API + "configuration"
@@ -1249,6 +1344,12 @@ class ArgumentsUtils:
             type=str,
             help="Public File ID of shared space, directory or a file",
         )
+        parser.add_argument(
+            "-s",
+            "--statistics_only",
+            action="store_true",
+            help="Print only statistics without downloading the data",
+        )
 
         return parser
 
@@ -1302,6 +1403,9 @@ class ArgumentsUtils:
         global FILE_ID
         FILE_ID = args.file_id
 
+        global ONLY_STATS
+        ONLY_STATS = args.statistics_only
+
         return 0
 
 
@@ -1319,6 +1423,8 @@ def main():
         - 5: Error while removing part files.
         - 6: Error while processing the node.
     """
+    global TIME_START
+
     parser = ArgumentsUtils.setup_parser()
     result = ArgumentsUtils.process_parser(parser)
     if result != 0:
@@ -1332,10 +1438,20 @@ def main():
         v_print(V.DEF, "Exploring and creating the directory structure")
         result = Processors.process_node(ONEZONE, FILE_ID, DIRECTORY)
         if result:
-            LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
+            if ROOT_DIRECTORY_SIZE != 0:
+                LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
             return result
+        LoggingUtils.print_predownload_statistics()
+        if ONLY_STATS:
+            v_print(V.DEF, "Statistics only mode, exiting")
+            return 0
+
+        if QP.get_queue(0).qsize() == 0:
+            v_print(V.DEF, "All the files are already downloaded or existent")
+            return 0
 
         v_print(V.DEF, "Downloading files")
+        TIME_START = time.time_ns()
         for thread_number in range(THREADS_NUMBER):
             result = (
                 threading.Thread(
