@@ -1056,7 +1056,7 @@ class Processors:
         else:
             v_print(
                 V.DEF,
-                "Error: Failed to retrieve information about the node. The requested node may not exist.",
+                f"Error: Failed to retrieve information about the node (file/directory). The requested node may not exist on the selected Onezone ({ONEZONE}).",
             )
             v_print(V.V, "requested node File ID =", file_id)
             v_print(V.V, response.json())
@@ -1343,7 +1343,8 @@ def main():
         v_print(V.DEF, "Exploring and creating the directory structure")
         result = Processors.process_node(ONEZONE, FILE_ID, DIRECTORY)
         if result:
-            LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
+            if ROOT_DIRECTORY_SIZE != 0:
+                LoggingUtils.print_download_statistics(DIRECTORY, finished=False)
             return result
         LoggingUtils.print_predownload_statistics()
         if ONLY_STATS:
